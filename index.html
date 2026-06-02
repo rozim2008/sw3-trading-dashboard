@@ -88,6 +88,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
   .card h3 { font-size: 13px; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
   .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
   .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px; }
+  .grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 20px; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
   .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
   .mb20 { margin-bottom: 20px; }
@@ -355,7 +356,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
 
     <!-- ===== OVERVIEW PAGE ===== -->
     <div class="page active" id="page-overview">
-      <div class="grid-5">
+      <div class="grid-6">
         <div class="stat-card blue">
           <div class="stat-label">Portfolio Value</div>
           <div class="stat-value text-accent" id="portfolio-value">—</div>
@@ -382,6 +383,14 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
           <div class="stat-sub"><span id="credits-sub">of 15 daily</span></div>
           <div style="margin-top:6px;background:var(--bg3);border-radius:3px;height:4px;overflow:hidden;">
             <div id="credits-bar" style="height:100%;background:#ffd600;width:0%;transition:width 0.4s;"></div>
+          </div>
+        </div>
+        <div class="stat-card" style="border-top:3px solid #00bcd4;">
+          <div class="stat-label">Credits This Month</div>
+          <div class="stat-value" id="credits-monthly-used" style="color:#00bcd4;">—</div>
+          <div class="stat-sub"><span id="credits-monthly-sub">of 35 monthly</span></div>
+          <div style="margin-top:6px;background:var(--bg3);border-radius:3px;height:4px;overflow:hidden;">
+            <div id="credits-monthly-bar" style="height:100%;background:#00bcd4;width:0%;transition:width 0.4s;"></div>
           </div>
         </div>
       </div>

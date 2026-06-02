@@ -3,16 +3,19 @@ const APP_URL = 'https://superagent-ad3740f7.base44.app';
 
 // ===== CREDIT TRACKER =====
 const DAILY_CREDIT_LIMIT = 15;
-const credits = { session: 0, daily: 0 };
+const MONTHLY_CREDIT_LIMIT = 35;
+const credits = { session: 0, daily: 0, monthly: 0 };
 
 function incrementCredit(cost) {
   cost = cost || 1;
   credits.session += cost;
   credits.daily += cost;
+  credits.monthly += cost;
   renderCreditUI();
 }
 
 function renderCreditUI() {
+  // Daily
   const used = credits.daily;
   const pct = Math.min((used / DAILY_CREDIT_LIMIT) * 100, 100);
   const color = used >= DAILY_CREDIT_LIMIT * 0.9 ? '#ff1744' : used >= DAILY_CREDIT_LIMIT * 0.6 ? '#ff9800' : '#ffd600';
@@ -24,6 +27,16 @@ function renderCreditUI() {
   if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
   if (sub) sub.textContent = 'of ' + DAILY_CREDIT_LIMIT + ' daily · ' + credits.session.toFixed(1) + ' this session';
   if (banner) { banner.textContent = used.toFixed(1) + '/' + DAILY_CREDIT_LIMIT; banner.style.color = color; }
+  // Monthly
+  const mused = credits.monthly;
+  const mpct = Math.min((mused / MONTHLY_CREDIT_LIMIT) * 100, 100);
+  const mcolor = mused >= MONTHLY_CREDIT_LIMIT * 0.9 ? '#ff1744' : mused >= MONTHLY_CREDIT_LIMIT * 0.6 ? '#ff9800' : '#00bcd4';
+  const mel = document.getElementById('credits-monthly-used');
+  const mbar = document.getElementById('credits-monthly-bar');
+  const msub = document.getElementById('credits-monthly-sub');
+  if (mel) { mel.textContent = mused.toFixed(1); mel.style.color = mcolor; }
+  if (mbar) { mbar.style.width = mpct + '%'; mbar.style.background = mcolor; }
+  if (msub) msub.textContent = 'of ' + MONTHLY_CREDIT_LIMIT + ' monthly';
 }
 const ENTITY_URL = 'https://app.base44.com/api/apps/6a148c2497d9232bad3740f7/entities';
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ZDgwOWRmMi1jYTBmLTQ3NzgtOWIwOS03ZDlkNDkxNGMxOGQiLCJjbGllbnRfaWQiOiI3ZDgwOWRmMi1jYTBmLTQ3NzgtOWIwOS03ZDlkNDkxNGMxOGQiLCJhcHBfaWQiOiI2YTE0OGMyNDk3ZDkyMzJiYWQzNzQwZjciLCJhdWQiOiJiYXNlNDRfYXBpIiwic2NvcGUiOiJhcHAuYWNjZXNzIiwiZXhwIjoxNzgwMzMxNTc0LCJpYXQiOjE3ODAzMjc5NzR9.eh_voahNGmXKhoJhNA4-TElvTe_jI7ob5U00Ihi2BBk';
