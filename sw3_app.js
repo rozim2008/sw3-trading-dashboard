@@ -216,14 +216,54 @@ async function fetchSignals(filter='') {
   } catch(e) { return []; }
 }
 
-async function renderSignals() {
-  const filter = document.getElementById('signal-filter')?.value || '';
-  const signals = await fetchSignals(filter);
-  state.signals = signals;
+// ===== SIGNAL SORT STATE =====
+const signalSort = { col: 'created_date', dir: 'desc' };
+
+function sortSignals(signals) {
+  const { col, dir } = signalSort;
+  return [...signals].sort((a, b) => {
+    let av = a[col], bv = b[col];
+    if (col === 'created_date') { av = new Date(av).getTime(); bv = new Date(bv).getTime(); }
+    else if (typeof av === 'string') { av = av?.toLowerCase() || ''; bv = bv?.toLowerCase() || ''; }
+    else { av = parseFloat(av) || 0; bv = parseFloat(bv) || 0; }
+    return dir === 'asc' ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+}
+
+function sortIcon(col) {
+  if (signalSort.col !== col) return '<span style="opacity:0.3;margin-left:4px;">⇅</span>';
+  return signalSort.dir === 'asc'
+    ? '<span style="color:#00e676;margin-left:4px;">↑</span>'
+    : '<span style="color:#00e676;margin-left:4px;">↓</span>';
+}
+
+function onSortSignals(col) {
+  if (signalSort.col === col) signalSort.dir = signalSort.dir === 'asc' ? 'desc' : 'asc';
+  else { signalSort.col = col; signalSort.dir = 'desc'; }
+  renderSignalsTable(state.signals);
+}
+
+function renderSignalsTable(signals) {
   const el = document.getElementById('signals-table');
-  if(!signals.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">🎯</div><p>No signals yet. Analyze a symbol to generate signals.</p></div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Time</th><th>Symbol</th><th>Signal</th><th>Confidence</th><th>Entry</th><th>Target</th><th>Stop</th><th>Risk</th><th>Status</th><th>Actions</th></tr></thead><tbody>` +
-    signals.map(s => `<tr>
+  if (!signals || !signals.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🎯</div><p>No signals yet. Analyze a symbol to generate signals.</p></div>';
+    return;
+  }
+  const sorted = sortSignals(signals);
+  const thStyle = 'cursor:pointer;user-select:none;white-space:nowrap;';
+  el.innerHTML = `<table><thead><tr>
+    <th style="${thStyle}" onclick="onSortSignals('created_date')">Time${sortIcon('created_date')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('symbol')">Symbol${sortIcon('symbol')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('signal_type')">Signal${sortIcon('signal_type')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('confidence')">Confidence${sortIcon('confidence')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('entry_price')">Entry${sortIcon('entry_price')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('target_price')">Target${sortIcon('target_price')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('stop_loss')">Stop${sortIcon('stop_loss')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('risk_score')">Risk${sortIcon('risk_score')}</th>
+    <th style="${thStyle}" onclick="onSortSignals('status')">Status${sortIcon('status')}</th>
+    <th>Actions</th>
+  </tr></thead><tbody>` +
+    sorted.map(s => `<tr>
       <td style="font-size:11px;">${new Date(s.created_date).toLocaleString()}</td>
       <td><strong>${s.symbol}</strong><br/><span class="tag">${s.strategy || '—'}</span></td>
       <td>${signalBadge(s.signal_type)}</td>
@@ -240,6 +280,13 @@ async function renderSignals() {
         </div>
       </td>
     </tr>`).join('') + '</tbody></table>';
+}
+
+async function renderSignals() {
+  const filter = document.getElementById('signal-filter')?.value || '';
+  const signals = await fetchSignals(filter);
+  state.signals = signals;
+  renderSignalsTable(signals);
 }
 
 async function renderRecentSignals() {
