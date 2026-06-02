@@ -29,13 +29,17 @@ const statusBadge = (s) => `<span class="badge badge-${s?.toLowerCase()}">${s}</
 
 async function apiCall(fn, payload) {
   try {
+    console.log('[SW3] apiCall', fn, JSON.stringify(payload).substring(0,100));
     const r = await fetch(`${APP_URL}/functions/${fn}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return await r.json();
-  } catch(e) { return { error: e.message }; }
+    console.log('[SW3] apiCall response status:', r.status, r.ok);
+    const result = await r.json();
+    console.log('[SW3] apiCall result keys:', Object.keys(result));
+    return result;
+  } catch(e) { console.error('[SW3] apiCall error:', e); return { error: e.message }; }
 }
 
 function showToast(msg, type='info') {
@@ -209,9 +213,13 @@ async function loadSignals() {
 
 async function fetchSignals(filter='') {
   try {
-    const data = await apiCall('aiAgent', { action: 'get_signals', status_filter: filter || undefined });
+    console.log('[SW3] fetchSignals called, filter:', filter);
+    const payload = { action: 'get_signals' };
+    if (filter) payload.status_filter = filter;
+    const data = await apiCall('aiAgent', payload);
+    console.log('[SW3] fetchSignals response:', JSON.stringify(data).substring(0, 200));
     return data.signals || [];
-  } catch(e) { console.error('fetchSignals error:', e); return []; }
+  } catch(e) { console.error('[SW3] fetchSignals error:', e); return []; }
 }
 
 async function renderSignals() {
