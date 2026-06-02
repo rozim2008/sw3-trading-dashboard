@@ -210,11 +210,8 @@ async function loadSignals() {
 
 async function fetchSignals(filter='') {
   try {
-    let url = `${ENTITY_URL}/TradeSignal`;
-    if (filter) url += `?status=${encodeURIComponent(filter)}`;
-    const r = await fetch(url, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
-    const data = await r.json();
-    return Array.isArray(data) ? data : [];
+    const data = await apiCall('aiAgent', { action: 'get_signals', status_filter: filter || undefined });
+    return data.signals || [];
   } catch(e) { console.error('fetchSignals error:', e); return []; }
 }
 
@@ -578,9 +575,8 @@ async function scanWatchlist() {
 // ===== WATCHLIST =====
 async function loadWatchlist() {
   try {
-    const r = await fetch(`${ENTITY_URL}/WatchList`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
-    const d = await r.json();
-    state.watchlist = d.items || d || [];
+    const data = await apiCall('aiAgent', { action: 'get_watchlist' });
+    state.watchlist = data.watchlist || [];
   } catch(e) { state.watchlist = []; }
   renderWatchlist();
   renderWatchlistMini();
@@ -626,12 +622,7 @@ async function addToWatchlist() {
   const notes = document.getElementById('wl-notes').value.trim();
   if(!symbol) { showToast('Symbol required', 'error'); return; }
   
-  await fetch(`${ENTITY_URL}/WatchList`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
-    body: JSON.stringify({ symbol, name, asset_class, sector, priority, notes, active: true }),
-    credentials: 'include',
-  });
+  await apiCall('aiAgent', { action: 'add_watchlist', symbol, name, asset_class, sector, notes });
   
   showToast(`${symbol} added to watchlist`, 'success');
   closeModal('modal-watchlist');
@@ -639,11 +630,7 @@ async function addToWatchlist() {
 }
 
 async function removeFromWatchlist(id) {
-  await fetch(`${ENTITY_URL}/WatchList/${id}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${API_TOKEN}` },
-    credentials: 'include',
-  });
+  await apiCall('aiAgent', { action: 'delete_watchlist', item_id: id });
   showToast('Removed from watchlist', 'success');
   loadWatchlist();
 }
@@ -704,9 +691,8 @@ function renderAgentsGrid() {
 
 async function loadAgentLogs() {
   try {
-    const r = await fetch(`${ENTITY_URL}/AgentLog`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
-    const d = await r.json();
-    state.agentLogs = d.items || d || [];
+    const data = await apiCall('aiAgent', { action: 'get_agent_logs' });
+    state.agentLogs = data.logs || [];
   } catch(e) { state.agentLogs = []; }
   renderAgentsGrid();
   
@@ -728,9 +714,8 @@ async function loadAgentLogs() {
 // ===== TRADE LOGS =====
 async function loadTradeLogs() {
   try {
-    const r = await fetch(`${ENTITY_URL}/TradeLog`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
-    const d = await r.json();
-    state.tradeLogs = d.items || d || [];
+    const data = await apiCall('aiAgent', { action: 'get_trade_logs' });
+    state.tradeLogs = data.trades || [];
   } catch(e) { state.tradeLogs = []; }
   
   const el = document.getElementById('trade-logs-table');
@@ -753,9 +738,8 @@ async function loadTradeLogs() {
 // ===== RISK SETTINGS =====
 async function loadRiskSettings() {
   try {
-    const r = await fetch(`${ENTITY_URL}/RiskSettings`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
-    const d = await r.json();
-    const s = (d.items || d)?.[0];
+    const data = await apiCall('aiAgent', { action: 'get_risk_settings' });
+    const s = data.settings;
     if(s) {
       document.getElementById('rs-max-daily-loss').value = s.max_daily_loss_pct || 3;
       document.getElementById('rs-max-position').value = s.max_position_size_pct || 10;
@@ -790,21 +774,12 @@ async function saveRiskSettings() {
   };
   
   try {
-    const r = await fetch(`${ENTITY_URL}/RiskSettings`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
-    const d = await r.json();
-    const existing = (d.items || d)?.[0];
-    
-    if(existing) {
-      await fetch(`${ENTITY_URL}/RiskSettings/${existing.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
-        body: JSON.stringify(payload), credentials: 'include',
-      });
-    } else {
-      await fetch(`${ENTITY_URL}/RiskSettings`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
-        body: JSON.stringify(payload), credentials: 'include',
-      });
-    }
+    const existing = await apiCall('aiAgent', { action: 'get_risk_settings' });
+    await apiCall('aiAgent', {
+      action: 'save_risk_settings',
+      settings_id: existing.settings?.id || null,
+      settings_data: payload,
+    });
     showToast('Risk settings saved!', 'success');
   } catch(e) { showToast('Failed to save: ' + e.message, 'error'); }
 }
