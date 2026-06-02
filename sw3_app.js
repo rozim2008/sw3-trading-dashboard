@@ -31,9 +31,8 @@ async function apiCall(fn, payload) {
   try {
     const r = await fetch(`${APP_URL}/functions/${fn}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      credentials: 'include',
     });
     return await r.json();
   } catch(e) { return { error: e.message }; }
