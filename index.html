@@ -87,6 +87,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
   .card-sm { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
   .card h3 { font-size: 13px; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
   .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
   .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
   .mb20 { margin-bottom: 20px; }
@@ -346,6 +347,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
       <div class="live-stat"><span>Approval:</span> <strong style="color:#00e676;">Required</strong></div>
       <div class="live-stat"><span>Max Loss/Day:</span> <strong>2%</strong></div>
       <div class="live-stat"><span>Balance:</span> <strong id="banner-balance">$50.00</strong></div>
+      <div class="live-stat"><span>Credits Today:</span> <strong id="banner-credits" style="color:#ffd600;">—/15</strong></div>
     </div>
   </div>
 
@@ -353,7 +355,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
 
     <!-- ===== OVERVIEW PAGE ===== -->
     <div class="page active" id="page-overview">
-      <div class="grid-4">
+      <div class="grid-5">
         <div class="stat-card blue">
           <div class="stat-label">Portfolio Value</div>
           <div class="stat-value text-accent" id="portfolio-value">—</div>
@@ -373,6 +375,14 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
           <div class="stat-label">Open Positions</div>
           <div class="stat-value" id="positions-count" style="color:var(--accent2)">—</div>
           <div class="stat-sub" id="positions-value">—</div>
+        </div>
+        <div class="stat-card" style="border-top:3px solid #ffd600;">
+          <div class="stat-label">Credits Today</div>
+          <div class="stat-value" id="credits-used" style="color:#ffd600;">—</div>
+          <div class="stat-sub"><span id="credits-sub">of 15 daily</span></div>
+          <div style="margin-top:6px;background:var(--bg3);border-radius:3px;height:4px;overflow:hidden;">
+            <div id="credits-bar" style="height:100%;background:#ffd600;width:0%;transition:width 0.4s;"></div>
+          </div>
         </div>
       </div>
 

@@ -1,5 +1,30 @@
 
 const APP_URL = 'https://superagent-ad3740f7.base44.app';
+
+// ===== CREDIT TRACKER =====
+const DAILY_CREDIT_LIMIT = 15;
+const credits = { session: 0, daily: 0 };
+
+function incrementCredit(cost) {
+  cost = cost || 1;
+  credits.session += cost;
+  credits.daily += cost;
+  renderCreditUI();
+}
+
+function renderCreditUI() {
+  const used = credits.daily;
+  const pct = Math.min((used / DAILY_CREDIT_LIMIT) * 100, 100);
+  const color = used >= DAILY_CREDIT_LIMIT * 0.9 ? '#ff1744' : used >= DAILY_CREDIT_LIMIT * 0.6 ? '#ff9800' : '#ffd600';
+  const el = document.getElementById('credits-used');
+  const bar = document.getElementById('credits-bar');
+  const sub = document.getElementById('credits-sub');
+  const banner = document.getElementById('banner-credits');
+  if (el) { el.textContent = used.toFixed(1); el.style.color = color; }
+  if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
+  if (sub) sub.textContent = 'of ' + DAILY_CREDIT_LIMIT + ' daily · ' + credits.session.toFixed(1) + ' this session';
+  if (banner) { banner.textContent = used.toFixed(1) + '/' + DAILY_CREDIT_LIMIT; banner.style.color = color; }
+}
 const ENTITY_URL = 'https://app.base44.com/api/apps/6a148c2497d9232bad3740f7/entities';
 const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ZDgwOWRmMi1jYTBmLTQ3NzgtOWIwOS03ZDlkNDkxNGMxOGQiLCJjbGllbnRfaWQiOiI3ZDgwOWRmMi1jYTBmLTQ3NzgtOWIwOS03ZDlkNDkxNGMxOGQiLCJhcHBfaWQiOiI2YTE0OGMyNDk3ZDkyMzJiYWQzNzQwZjciLCJhdWQiOiJiYXNlNDRfYXBpIiwic2NvcGUiOiJhcHAuYWNjZXNzIiwiZXhwIjoxNzgwMzMxNTc0LCJpYXQiOjE3ODAzMjc5NzR9.eh_voahNGmXKhoJhNA4-TElvTe_jI7ob5U00Ihi2BBk';
 
@@ -34,7 +59,10 @@ async function apiCall(fn, payload) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return await r.json();
+    const result = await r.json();
+    // Track credit usage: ~1 credit per function call
+    incrementCredit(1);
+    return result;
   } catch(e) { return { error: e.message }; }
 }
 
