@@ -958,15 +958,21 @@ async function loadChartData() {
   destroyCharts();
 
   try {
-    const { start, end, resolution } = tfParams(chartState.tf);
+    const { start, end, resolution, limit } = tfParams(chartState.tf);
     const data = await apiCall('aiAgent', { action: 'get_bars', symbol: sym, timeframe: resolution, start, end, limit: limit || 1000 });
     const bars = data.bars || [];
     if (!bars.length) throw new Error('No data returned for ' + sym);
     chartState.ohlcv = bars;
-    renderCharts();
+    try { renderCharts(); } catch(renderErr) {
+      document.getElementById('chart-loading').style.display='flex';
+      document.getElementById('chart-loading').textContent='Chart render error: '+renderErr.message;
+      console.error('renderCharts error:',renderErr); return;
+    }
     updatePriceBadge();
   } catch(e) {
+    document.getElementById('chart-loading').style.display='flex';
     document.getElementById('chart-loading').textContent = 'Could not load data: ' + e.message;
+    console.error('loadChartData error:',e);
   }
 }
 
@@ -1110,7 +1116,7 @@ function renderMacdChart() {
   const wrap = document.getElementById('chart-macd-wrap');
   const el = document.getElementById('chart-macd');
   el.innerHTML = '';
-  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100), width: el.clientWidth || mainW });
+  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100), width: el.clientWidth || document.getElementById('chart-main').clientWidth || window.innerWidth - 220 });
   chartState.macdChart = mc2;
   const macdLine = mc2.addLineSeries({ color: '#00bcd4', lineWidth: 1.5 });
   const signalLine = mc2.addLineSeries({ color: '#ff9800', lineWidth: 1.5 });
