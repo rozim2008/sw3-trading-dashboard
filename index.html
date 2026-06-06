@@ -284,6 +284,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
   .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
   .modal-close { float: right; cursor: pointer; color: var(--text3); font-size: 20px; line-height: 1; }
 </style>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 
@@ -306,6 +307,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
     <div class="nav-section">Analysis</div>
     <div class="nav-item" onclick="showPage('analyze')"><span class="icon">🔍</span> Analyze Symbol</div>
     <div class="nav-item" onclick="showPage('watchlist')"><span class="icon">👁</span> Watchlist</div>
+    <div class="nav-item" onclick="showPage('chart')" id="nav-chart"><span class="icon">📈</span> Chart</div>
 
     <div class="nav-section">System</div>
     <div class="nav-item" onclick="showPage('agents')"><span class="icon">🤖</span> AI Agents</div>
@@ -710,6 +712,69 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
           </div>
         </div>
       </div>
+
+    <!-- CHART PAGE -->
+    <div id="page-chart" class="page" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="btn btn-ghost btn-sm" onclick="showPage(state.chartPrevPage||'watchlist')">← Back</button>
+          <div>
+            <div id="chart-symbol-title" style="font-size:22px;font-weight:800;color:var(--text1);">—</div>
+            <div id="chart-symbol-name" style="font-size:12px;color:var(--text3);">Loading...</div>
+          </div>
+          <div id="chart-price-badge" style="font-size:20px;font-weight:700;color:#00e676;">—</div>
+          <div id="chart-change-badge" style="font-size:13px;font-weight:600;">—</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <div class="btn-group" id="chart-tf-btns">
+            <button class="btn btn-sm chart-tf active-tf" data-tf="1D">1D</button>
+            <button class="btn btn-sm chart-tf" data-tf="5D">5D</button>
+            <button class="btn btn-sm chart-tf" data-tf="1M">1M</button>
+            <button class="btn btn-sm chart-tf" data-tf="3M">3M</button>
+            <button class="btn btn-sm chart-tf" data-tf="6M">6M</button>
+            <button class="btn btn-sm chart-tf" data-tf="1Y">1Y</button>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-sm chart-type active-tf" data-type="candlestick" id="btn-candle">🕯 Candle</button>
+            <button class="btn btn-sm chart-type" data-type="line" id="btn-line">📉 Line</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <label class="ind-toggle"><input type="checkbox" id="ind-bb" onchange="updateIndicators()"> <span>BB</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-ma20" checked onchange="updateIndicators()"> <span>MA20</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-ma50" checked onchange="updateIndicators()"> <span>MA50</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-ma200" onchange="updateIndicators()"> <span>MA200</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-ema21" onchange="updateIndicators()"> <span>EMA21</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-vwap" onchange="updateIndicators()"> <span>VWAP</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-fib" onchange="updateIndicators()"> <span>Fibonacci</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-vol" checked onchange="updateIndicators()"> <span>Volume</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-rsi" checked onchange="updateIndicators()"> <span>RSI</span></label>
+        <label class="ind-toggle"><input type="checkbox" id="ind-macd" onchange="updateIndicators()"> <span>MACD</span></label>
+      </div>
+      <div style="position:relative;background:var(--bg2);border-radius:10px;border:1px solid var(--border);overflow:hidden;margin-bottom:8px;">
+        <div id="chart-main" style="height:420px;width:100%;"></div>
+        <div id="chart-legend" style="position:absolute;top:10px;left:12px;font-size:11px;color:var(--text2);pointer-events:none;line-height:1.7;"></div>
+        <div id="chart-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg2);z-index:10;font-size:14px;color:var(--text3);">Loading chart data...</div>
+      </div>
+      <div id="chart-vol-wrap" style="background:var(--bg2);border-radius:8px;border:1px solid var(--border);overflow:hidden;margin-bottom:8px;">
+        <div style="padding:4px 12px;font-size:11px;color:var(--text3);font-weight:600;">VOLUME</div>
+        <div id="chart-vol" style="height:80px;width:100%;"></div>
+      </div>
+      <div id="chart-rsi-wrap" style="background:var(--bg2);border-radius:8px;border:1px solid var(--border);overflow:hidden;margin-bottom:8px;">
+        <div style="padding:4px 12px;font-size:11px;color:var(--text3);font-weight:600;">RSI (14)</div>
+        <div id="chart-rsi" style="height:100px;width:100%;"></div>
+      </div>
+      <div id="chart-macd-wrap" style="background:var(--bg2);border-radius:8px;border:1px solid var(--border);overflow:hidden;margin-bottom:8px;display:none;">
+        <div style="padding:4px 12px;font-size:11px;color:var(--text3);font-weight:600;">MACD (12,26,9)</div>
+        <div id="chart-macd" style="height:100px;width:100%;"></div>
+      </div>
+      <div id="chart-signal-info" style="display:none;background:var(--bg2);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">LATEST AI SIGNAL</div>
+        <div id="chart-signal-detail"></div>
+      </div>
+    </div>
+
     </div>
 
   </div><!-- /content -->

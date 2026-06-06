@@ -93,7 +93,7 @@ function showPage(p) {
   document.getElementById('page-' + p)?.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(x => { if(x.textContent.trim().toLowerCase().includes(p.replace('-',' '))) x.classList.add('active'); });
   
-  const titles = { overview:'Overview', portfolio:'Portfolio', signals:'AI Signals', trade:'Execute Trade', orders:'Order History', analyze:'Analyze Symbol', watchlist:'Watchlist', agents:'AI Agents', logs:'Trade Logs', risk:'Risk Settings' };
+  const titles = { overview:'Overview', portfolio:'Portfolio', signals:'AI Signals', trade:'Execute Trade', orders:'Order History', analyze:'Analyze Symbol', watchlist:'Watchlist', chart:'Chart', agents:'AI Agents', logs:'Trade Logs', risk:'Risk Settings' };
   document.getElementById('page-title').textContent = titles[p] || p;
   document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
 
@@ -920,3 +920,416 @@ async function init() {
 }
 
 init();
+
+// ============================================================
+// CHART PAGE
+// ============================================================
+const chartState = {
+  symbol: null, name: null, tf: '1D', type: 'candlestick',
+  ohlcv: [], mainChart: null, volChart: null, rsiChart: null, macdChart: null,
+  series: {}, prevPage: 'watchlist'
+};
+
+function openChart(symbol, name, fromPage) {
+  chartState.symbol = symbol;
+  chartState.name = name || symbol;
+  chartState.prevPage = fromPage || 'watchlist';
+  state.chartPrevPage = chartState.prevPage;
+  showPage('chart');
+  loadChartData();
+}
+
+// Make showPage aware of chart
+const _origShowPage = showPage;
+// Patch: add chart to page routing titles
+(function patchTitles() {
+  const orig = showPage;
+})();
+
+async function loadChartData() {
+  const sym = chartState.symbol;
+  if (!sym) return;
+  document.getElementById('chart-symbol-title').textContent = sym;
+  document.getElementById('chart-symbol-name').textContent = chartState.name;
+  document.getElementById('chart-price-badge').textContent = '—';
+  document.getElementById('chart-change-badge').textContent = '';
+  document.getElementById('chart-loading').style.display = 'flex';
+
+  destroyCharts();
+
+  try {
+    const { start, end, resolution } = tfParams(chartState.tf);
+    const data = await apiCall('aiAgent', { action: 'get_bars', symbol: sym, timeframe: resolution, start, end, limit: 1000 });
+    const bars = data.bars || [];
+    if (!bars.length) throw new Error('No data returned for ' + sym);
+    chartState.ohlcv = bars;
+    renderCharts();
+    updatePriceBadge();
+  } catch(e) {
+    document.getElementById('chart-loading').textContent = 'Could not load data: ' + e.message;
+  }
+}
+
+function tfParams(tf) {
+  const now = new Date();
+  const end = now.toISOString().split('T')[0];
+  let start, resolution;
+  switch(tf) {
+    case '1D': start = end; resolution = '5Min'; break;
+    case '5D': const d5 = new Date(now); d5.setDate(d5.getDate()-5); start = d5.toISOString().split('T')[0]; resolution = '15Min'; break;
+    case '1M': const m1 = new Date(now); m1.setMonth(m1.getMonth()-1); start = m1.toISOString().split('T')[0]; resolution = '1Hour'; break;
+    case '3M': const m3 = new Date(now); m3.setMonth(m3.getMonth()-3); start = m3.toISOString().split('T')[0]; resolution = '1Day'; break;
+    case '6M': const m6 = new Date(now); m6.setMonth(m6.getMonth()-6); start = m6.toISOString().split('T')[0]; resolution = '1Day'; break;
+    case '1Y': const y1 = new Date(now); y1.setFullYear(y1.getFullYear()-1); start = y1.toISOString().split('T')[0]; resolution = '1Day'; break;
+    default: start = end; resolution = '5Min';
+  }
+  return { start, end, resolution };
+}
+
+
+
+function destroyCharts() {
+  try { if (chartState.mainChart) { chartState.mainChart.remove(); chartState.mainChart = null; } } catch(e){}
+  try { if (chartState.volChart) { chartState.volChart.remove(); chartState.volChart = null; } } catch(e){}
+  try { if (chartState.rsiChart) { chartState.rsiChart.remove(); chartState.rsiChart = null; } } catch(e){}
+  try { if (chartState.macdChart) { chartState.macdChart.remove(); chartState.macdChart = null; } } catch(e){}
+  chartState.series = {};
+}
+
+const CHART_OPTS = (height) => ({
+  layout: { background: { color: '#151522' }, textColor: '#a0a0b8' },
+  grid: { vertLines: { color: '#1e1e2e' }, horzLines: { color: '#1e1e2e' } },
+  crosshair: { mode: 1 },
+  timeScale: { borderColor: '#2a2a3a', timeVisible: true, secondsVisible: false },
+  rightPriceScale: { borderColor: '#2a2a3a' },
+  height
+});
+
+function renderCharts() {
+  const bars = chartState.ohlcv;
+  document.getElementById('chart-loading').style.display = 'none';
+
+  // ---- MAIN CHART ----
+  const mainEl = document.getElementById('chart-main');
+  mainEl.innerHTML = '';
+  const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420), width: mainEl.clientWidth });
+  chartState.mainChart = mc;
+
+  let mainSeries;
+  if (chartState.type === 'candlestick') {
+    mainSeries = mc.addCandlestickSeries({
+      upColor: '#00e676', downColor: '#ff1744', borderUpColor: '#00e676', borderDownColor: '#ff1744',
+      wickUpColor: '#00e676', wickDownColor: '#ff1744'
+    });
+    mainSeries.setData(bars.map(b => ({ time: b.t.split('T')[0] || toTs(b.t), open: b.o, high: b.h, low: b.l, close: b.c })));
+  } else {
+    mainSeries = mc.addLineSeries({ color: '#7c4dff', lineWidth: 2 });
+    mainSeries.setData(bars.map(b => ({ time: b.t.split('T')[0] || toTs(b.t), value: b.c })));
+  }
+  chartState.series.main = mainSeries;
+
+  // ---- VOLUME SUB-CHART ----
+  const volEl = document.getElementById('chart-vol');
+  volEl.innerHTML = '';
+  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80), width: volEl.clientWidth });
+  chartState.volChart = vc;
+  const volSeries = vc.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
+  volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
+  volSeries.setData(bars.map(b => ({ time: b.t.split('T')[0], value: b.v, color: b.c >= b.o ? '#00e67655' : '#ff174455' })));
+  chartState.series.vol = volSeries;
+
+  // ---- RSI SUB-CHART ----
+  const rsiEl = document.getElementById('chart-rsi');
+  rsiEl.innerHTML = '';
+  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100), width: rsiEl.clientWidth });
+  chartState.rsiChart = rc;
+  const rsiData = calcRSI(bars.map(b => b.c), 14);
+  const rsiSeries = rc.addLineSeries({ color: '#ff9800', lineWidth: 1.5, priceFormat: { type: 'price', precision: 1 } });
+  rsiSeries.setData(rsiData.map((v, i) => ({ time: bars[i + 14].t.split('T')[0], value: v })));
+  // OB/OS lines
+  const ob = rc.addLineSeries({ color: '#ff174455', lineWidth: 1, lineStyle: 2, priceFormat: {type:'price'} });
+  const os = rc.addLineSeries({ color: '#00e67655', lineWidth: 1, lineStyle: 2, priceFormat: {type:'price'} });
+  ob.setData(rsiData.map((_, i) => ({ time: bars[i+14].t.split('T')[0], value: 70 })));
+  os.setData(rsiData.map((_, i) => ({ time: bars[i+14].t.split('T')[0], value: 30 })));
+  chartState.series.rsi = rsiSeries;
+
+  // ---- MACD SUB-CHART (rendered if toggled) ----
+  renderMacdChart();
+
+  // Apply indicator overlays
+  updateIndicators();
+
+  // Sync time scales
+  syncTimeScales();
+
+  // Resize on window resize
+  const ro = new ResizeObserver(() => {
+    try {
+      mc.applyOptions({ width: mainEl.clientWidth });
+      vc.applyOptions({ width: volEl.clientWidth });
+      rc.applyOptions({ width: rsiEl.clientWidth });
+    } catch(e){}
+  });
+  ro.observe(mainEl);
+}
+
+function renderMacdChart() {
+  const bars = chartState.ohlcv;
+  const closes = bars.map(b => b.c);
+  const macdData = calcMACD(closes, 12, 26, 9);
+  const wrap = document.getElementById('chart-macd-wrap');
+  const el = document.getElementById('chart-macd');
+  el.innerHTML = '';
+  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100), width: el.clientWidth });
+  chartState.macdChart = mc2;
+  const macdLine = mc2.addLineSeries({ color: '#00bcd4', lineWidth: 1.5 });
+  const signalLine = mc2.addLineSeries({ color: '#ff9800', lineWidth: 1.5 });
+  const histSeries = mc2.addHistogramSeries({ priceFormat: { type: 'price' } });
+  const startIdx = 26 + 9 - 2;
+  macdLine.setData(macdData.macd.map((v, i) => ({ time: bars[i + startIdx].t.split('T')[0], value: v })));
+  signalLine.setData(macdData.signal.map((v, i) => ({ time: bars[i + startIdx].t.split('T')[0], value: v })));
+  histSeries.setData(macdData.hist.map((v, i) => ({ time: bars[i + startIdx].t.split('T')[0], value: v, color: v >= 0 ? '#00e67666' : '#ff174466' })));
+  chartState.series.macd = { macdLine, signalLine, histSeries };
+}
+
+function syncTimeScales() {
+  const charts = [chartState.mainChart, chartState.volChart, chartState.rsiChart, chartState.macdChart].filter(Boolean);
+  charts.forEach(c => {
+    c.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      if (!range) return;
+      charts.forEach(other => { if (other !== c) try { other.timeScale().setVisibleLogicalRange(range); } catch(e){} });
+    });
+  });
+}
+
+function updateIndicators() {
+  const bars = chartState.ohlcv;
+  if (!bars.length || !chartState.mainChart) return;
+  const closes = bars.map(b => b.c);
+  const highs  = bars.map(b => b.h);
+  const lows   = bars.map(b => b.l);
+  const mc = chartState.mainChart;
+  const times = bars.map(b => b.t.split('T')[0]);
+
+  // Remove old overlay series
+  ['ma20','ma50','ma200','ema21','bb_upper','bb_lower','bb_mid','vwap','fib_levels'].forEach(k => {
+    if (chartState.series[k]) { try { mc.removeSeries(chartState.series[k]); } catch(e){} delete chartState.series[k]; }
+  });
+
+  const addLine = (data, color, lineWidth=1, lineStyle=0) => {
+    const s = mc.addLineSeries({ color, lineWidth, lineStyle, priceFormat:{type:'price',precision:2}, lastValueVisible:false, priceLineVisible:false });
+    s.setData(data);
+    return s;
+  };
+
+  // MA20
+  if (document.getElementById('ind-ma20')?.checked) {
+    const ma = calcSMA(closes, 20);
+    chartState.series.ma20 = addLine(ma.map((v,i)=>({time:times[i+19],value:v})), '#2196f3', 1.5);
+  }
+  // MA50
+  if (document.getElementById('ind-ma50')?.checked) {
+    const ma = calcSMA(closes, 50);
+    chartState.series.ma50 = addLine(ma.map((v,i)=>({time:times[i+49],value:v})), '#ff9800', 1.5);
+  }
+  // MA200
+  if (document.getElementById('ind-ma200')?.checked && bars.length > 200) {
+    const ma = calcSMA(closes, 200);
+    chartState.series.ma200 = addLine(ma.map((v,i)=>({time:times[i+199],value:v})), '#e91e63', 1.5);
+  }
+  // EMA21
+  if (document.getElementById('ind-ema21')?.checked) {
+    const ema = calcEMA(closes, 21);
+    chartState.series.ema21 = addLine(ema.map((v,i)=>({time:times[i+20],value:v})), '#00bcd4', 1.5);
+  }
+  // Bollinger Bands
+  if (document.getElementById('ind-bb')?.checked) {
+    const bb = calcBB(closes, 20, 2);
+    chartState.series.bb_upper = addLine(bb.upper.map((v,i)=>({time:times[i+19],value:v})), '#9c27b055', 1, 1);
+    chartState.series.bb_lower = addLine(bb.lower.map((v,i)=>({time:times[i+19],value:v})), '#9c27b055', 1, 1);
+    chartState.series.bb_mid   = addLine(bb.mid.map((v,i)=>({time:times[i+19],value:v})),   '#9c27b033', 1, 2);
+  }
+  // VWAP (session)
+  if (document.getElementById('ind-vwap')?.checked) {
+    const vwap = calcVWAP(bars);
+    chartState.series.vwap = addLine(vwap.map((v,i)=>({time:times[i],value:v})), '#ffd600', 1.5, 1);
+  }
+  // Fibonacci
+  if (document.getElementById('ind-fib')?.checked) {
+    const hi = Math.max(...highs), lo = Math.min(...lows);
+    const fibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1].map(r => hi - (hi - lo) * r);
+    const fibColors = ['#ef535055','#ff980055','#ffeb3b55','#4caf5055','#2196f355','#9c27b055','#ef535055'];
+    fibLevels.forEach((level, idx) => {
+      const s = mc.addLineSeries({ color: fibColors[idx], lineWidth: 1, lineStyle: 2, lastValueVisible: true, priceLineVisible: false });
+      s.setData([{time: times[0], value: level}, {time: times[times.length-1], value: level}]);
+    });
+  }
+
+  // Show/hide volume
+  const showVol = document.getElementById('ind-vol')?.checked;
+  document.getElementById('chart-vol-wrap').style.display = showVol ? '' : 'none';
+
+  // Show/hide RSI
+  const showRsi = document.getElementById('ind-rsi')?.checked;
+  document.getElementById('chart-rsi-wrap').style.display = showRsi ? '' : 'none';
+
+  // Show/hide MACD
+  const showMacd = document.getElementById('ind-macd')?.checked;
+  document.getElementById('chart-macd-wrap').style.display = showMacd ? '' : 'none';
+
+  updateLegend();
+}
+
+function updateLegend() {
+  const parts = [];
+  if (document.getElementById('ind-ma20')?.checked)  parts.push('<span style="color:#2196f3">● MA20</span>');
+  if (document.getElementById('ind-ma50')?.checked)  parts.push('<span style="color:#ff9800">● MA50</span>');
+  if (document.getElementById('ind-ma200')?.checked) parts.push('<span style="color:#e91e63">● MA200</span>');
+  if (document.getElementById('ind-ema21')?.checked) parts.push('<span style="color:#00bcd4">● EMA21</span>');
+  if (document.getElementById('ind-bb')?.checked)    parts.push('<span style="color:#9c27b0">● BB(20,2)</span>');
+  if (document.getElementById('ind-vwap')?.checked)  parts.push('<span style="color:#ffd600">● VWAP</span>');
+  if (document.getElementById('ind-fib')?.checked)   parts.push('<span style="color:#aaa">● Fib</span>');
+  document.getElementById('chart-legend').innerHTML = parts.join('  ');
+}
+
+function updatePriceBadge() {
+  const bars = chartState.ohlcv;
+  if (!bars.length) return;
+  const last = bars[bars.length - 1];
+  const first = bars[0];
+  const chg = ((last.c - first.o) / first.o * 100).toFixed(2);
+  const color = chg >= 0 ? '#00e676' : '#ff1744';
+  document.getElementById('chart-price-badge').textContent = `$${last.c.toFixed(2)}`;
+  document.getElementById('chart-price-badge').style.color = color;
+  document.getElementById('chart-change-badge').innerHTML = `<span style="color:${color}">${chg >= 0 ? '+' : ''}${chg}%</span>`;
+}
+
+// ---- Timeframe buttons ----
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('chart-tf')) {
+    document.querySelectorAll('.chart-tf').forEach(b => b.classList.remove('active-tf'));
+    e.target.classList.add('active-tf');
+    chartState.tf = e.target.dataset.tf;
+    loadChartData();
+  }
+  if (e.target.classList.contains('chart-type') || e.target.closest('.chart-type')) {
+    const btn = e.target.classList.contains('chart-type') ? e.target : e.target.closest('.chart-type');
+    document.querySelectorAll('.chart-type').forEach(b => b.classList.remove('active-tf'));
+    btn.classList.add('active-tf');
+    chartState.type = btn.dataset.type;
+    loadChartData();
+  }
+});
+
+// ============================================================
+// INDICATOR MATH
+// ============================================================
+function calcSMA(closes, period) {
+  const res = [];
+  for (let i = period - 1; i < closes.length; i++) {
+    res.push(closes.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period);
+  }
+  return res;
+}
+function calcEMA(closes, period) {
+  const k = 2 / (period + 1);
+  const res = [];
+  let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < closes.length; i++) {
+    ema = closes[i] * k + ema * (1 - k);
+    res.push(ema);
+  }
+  return res;
+}
+function calcRSI(closes, period) {
+  const res = [];
+  for (let i = period; i < closes.length; i++) {
+    const slice = closes.slice(i - period, i);
+    let gain = 0, loss = 0;
+    for (let j = 1; j < slice.length; j++) {
+      const d = slice[j] - slice[j-1];
+      if (d > 0) gain += d; else loss -= d;
+    }
+    const rs = gain / (loss || 0.0001);
+    res.push(100 - 100 / (1 + rs));
+  }
+  return res;
+}
+function calcBB(closes, period, mult) {
+  const sma = calcSMA(closes, period);
+  const upper = [], lower = [], mid = [];
+  sma.forEach((m, i) => {
+    const slice = closes.slice(i, i + period);
+    const sd = Math.sqrt(slice.reduce((a, b) => a + Math.pow(b - m, 2), 0) / period);
+    upper.push(m + mult * sd);
+    lower.push(m - mult * sd);
+    mid.push(m);
+  });
+  return { upper, lower, mid };
+}
+function calcVWAP(bars) {
+  let cumTP = 0, cumVol = 0;
+  return bars.map(b => {
+    const tp = (b.h + b.l + b.c) / 3;
+    cumTP  += tp * b.v;
+    cumVol += b.v;
+    return cumTP / cumVol;
+  });
+}
+function calcMACD(closes, fast, slow, signal) {
+  const emaFast   = calcEMAFull(closes, fast);
+  const emaSlow   = calcEMAFull(closes, slow);
+  const startIdx  = slow - 1;
+  const macdLine  = emaSlow.map((v, i) => emaFast[i + (fast - slow)] - v);
+  const signalArr = calcEMAFull(macdLine, signal);
+  const hist      = signalArr.map((v, i) => macdLine[i + signal - 1] - v);
+  return { macd: macdLine.slice(signal - 1), signal: signalArr, hist };
+}
+function calcEMAFull(closes, period) {
+  const k = 2 / (period + 1);
+  const res = [closes.slice(0, period).reduce((a, b) => a + b, 0) / period];
+  for (let i = period; i < closes.length; i++) {
+    res.push(closes[i] * k + res[res.length-1] * (1 - k));
+  }
+  return res;
+}
+
+// ============================================================
+// MAKE SYMBOLS CLICKABLE IN WATCHLIST + SIGNALS + PORTFOLIO
+// ============================================================
+// Patch renderWatchlist to add symbol-link
+const _origRenderWatchlist = renderWatchlist;
+function renderWatchlist() {
+  const el = document.getElementById('watchlist-table');
+  if (!state.watchlist.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👁</div><p>No symbols in watchlist.</p></div>'; return; }
+  el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Name</th><th>Asset Class</th><th>Sector</th><th>Active</th><th>Notes</th><th>Actions</th></tr></thead><tbody>` +
+    state.watchlist.map(w => `<tr>
+      <td><strong class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\\'")}','watchlist')">${w.symbol}</strong></td>
+      <td class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\\'")}','watchlist')" style="color:var(--text2);">${w.name || '—'}</td>
+      <td><span class="tag">${w.asset_class || 'stock'}</span></td>
+      <td>${w.sector || '—'}</td>
+      <td>${w.active ? '✅' : '⬜'}</td>
+      <td style="font-size:11px;color:var(--text2);">${w.notes || '—'}</td>
+      <td><div class="btn-group">
+        <button class="btn btn-ghost btn-sm" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\\'")}','watchlist')">📈 Chart</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('analyze-symbol').value='${w.symbol}';showPage('analyze');analyzeSymbol()">Analyze</button>
+        <button class="btn btn-danger btn-sm" onclick="removeFromWatchlist('${w.id}')">✕</button>
+      </div></td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+// Patch renderSignalsTable to make symbol clickable
+const _origRenderSignals = renderSignalsTable;
+function renderSignalsTable(signals) {
+  _origRenderSignals(signals);
+  // Add click handlers to symbol cells after render
+  setTimeout(() => {
+    document.querySelectorAll('#signals-table td:first-child strong').forEach(el => {
+      const sym = el.textContent.trim();
+      el.classList.add('symbol-link');
+      el.style.cursor = 'pointer';
+      el.onclick = () => openChart(sym, sym, 'signals');
+    });
+  }, 50);
+}
+
