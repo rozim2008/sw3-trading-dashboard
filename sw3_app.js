@@ -105,6 +105,14 @@ function showPage(p) {
   if(p === 'logs') loadTradeLogs();
   if(p === 'trade') loadRecentOrders();
   if(p === 'risk') loadRiskSettings();
+  if(p === 'chart') {
+    // If no symbol loaded yet, default to AAPL
+    if (!chartState.symbol) {
+      chartState.symbol = 'AAPL';
+      chartState.name = 'Apple Inc.';
+    }
+    loadChartData();
+  }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
