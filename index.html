@@ -307,7 +307,7 @@ var luxon=function(e){"use strict";function L(e,t){for(var n=0;n<t.length;n++){v
     <div class="nav-section">Analysis</div>
     <div class="nav-item" onclick="showPage('analyze')"><span class="icon">🔍</span> Analyze Symbol</div>
     <div class="nav-item" onclick="showPage('watchlist')"><span class="icon">👁</span> Watchlist</div>
-    <div class="nav-item" onclick="showPage('chart')" id="nav-chart"><span class="icon">📈</span> Chart</div>
+    <div class="nav-item" onclick="openChart(chartState.symbol||'AAPL', chartState.name||'Apple Inc.', state.page||'overview')" id="nav-chart"><span class="icon">📈</span> Chart</div>
 
     <div class="nav-section">System</div>
     <div class="nav-item" onclick="showPage('agents')"><span class="icon">🤖</span> AI Agents</div>

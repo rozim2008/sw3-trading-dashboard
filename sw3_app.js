@@ -88,6 +88,7 @@ function showToast(msg, type='info') {
 }
 
 function showPage(p) {
+  state.page = p;
   document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
   document.getElementById('page-' + p)?.classList.add('active');
