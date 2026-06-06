@@ -959,7 +959,7 @@ async function loadChartData() {
 
   try {
     const { start, end, resolution } = tfParams(chartState.tf);
-    const data = await apiCall('aiAgent', { action: 'get_bars', symbol: sym, timeframe: resolution, start, end, limit: 1000 });
+    const data = await apiCall('aiAgent', { action: 'get_bars', symbol: sym, timeframe: resolution, start, end, limit: limit || 1000 });
     const bars = data.bars || [];
     if (!bars.length) throw new Error('No data returned for ' + sym);
     chartState.ohlcv = bars;
@@ -972,18 +972,42 @@ async function loadChartData() {
 
 function tfParams(tf) {
   const now = new Date();
-  const end = now.toISOString().split('T')[0];
-  let start, resolution;
+  // Use yesterday as end to avoid weekend/holiday gaps
+  const endD = new Date(now); endD.setDate(endD.getDate() - 1);
+  const end = endD.toISOString().split('T')[0];
+  let start, resolution, limit;
   switch(tf) {
-    case '1D': start = end; resolution = '5Min'; break;
-    case '5D': const d5 = new Date(now); d5.setDate(d5.getDate()-5); start = d5.toISOString().split('T')[0]; resolution = '15Min'; break;
-    case '1M': const m1 = new Date(now); m1.setMonth(m1.getMonth()-1); start = m1.toISOString().split('T')[0]; resolution = '1Hour'; break;
-    case '3M': const m3 = new Date(now); m3.setMonth(m3.getMonth()-3); start = m3.toISOString().split('T')[0]; resolution = '1Day'; break;
-    case '6M': const m6 = new Date(now); m6.setMonth(m6.getMonth()-6); start = m6.toISOString().split('T')[0]; resolution = '1Day'; break;
-    case '1Y': const y1 = new Date(now); y1.setFullYear(y1.getFullYear()-1); start = y1.toISOString().split('T')[0]; resolution = '1Day'; break;
-    default: start = end; resolution = '5Min';
+    case '1D': {
+      // Go back 5 days to ensure we get at least 1 trading day of intraday bars
+      const s = new Date(now); s.setDate(s.getDate()-5);
+      start = s.toISOString().split('T')[0]; resolution = '5Min'; limit = 500; break;
+    }
+    case '5D': {
+      const s = new Date(now); s.setDate(s.getDate()-7);
+      start = s.toISOString().split('T')[0]; resolution = '15Min'; limit = 500; break;
+    }
+    case '1M': {
+      const s = new Date(now); s.setMonth(s.getMonth()-1); s.setDate(s.getDate()-3);
+      start = s.toISOString().split('T')[0]; resolution = '1Hour'; limit = 500; break;
+    }
+    case '3M': {
+      const s = new Date(now); s.setMonth(s.getMonth()-3); s.setDate(s.getDate()-5);
+      start = s.toISOString().split('T')[0]; resolution = '1Day'; limit = 100; break;
+    }
+    case '6M': {
+      const s = new Date(now); s.setMonth(s.getMonth()-6); s.setDate(s.getDate()-5);
+      start = s.toISOString().split('T')[0]; resolution = '1Day'; limit = 200; break;
+    }
+    case '1Y': {
+      const s = new Date(now); s.setFullYear(s.getFullYear()-1); s.setDate(s.getDate()-5);
+      start = s.toISOString().split('T')[0]; resolution = '1Day'; limit = 365; break;
+    }
+    default: {
+      const s = new Date(now); s.setDate(s.getDate()-5);
+      start = s.toISOString().split('T')[0]; resolution = '5Min'; limit = 500;
+    }
   }
-  return { start, end, resolution };
+  return { start, end, resolution, limit };
 }
 
 
@@ -1002,17 +1026,25 @@ const CHART_OPTS = (height) => ({
   crosshair: { mode: 1 },
   timeScale: { borderColor: '#2a2a3a', timeVisible: true, secondsVisible: false },
   rightPriceScale: { borderColor: '#2a2a3a' },
+  autoSize: false,
   height
 });
 
 function renderCharts() {
-  const bars = chartState.ohlcv;
+  let bars = chartState.ohlcv;
+  // For 1D timeframe, keep only bars from the most recent trading date
+  if (chartState.tf === '1D' && bars.length > 0) {
+    const lastDate = bars[bars.length - 1].t.substring(0, 10);
+    const dayBars = bars.filter(b => b.t.startsWith(lastDate));
+    if (dayBars.length > 0) bars = dayBars;
+  }
   document.getElementById('chart-loading').style.display = 'none';
 
   // ---- MAIN CHART ----
   const mainEl = document.getElementById('chart-main');
   mainEl.innerHTML = '';
-  const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420), width: mainEl.clientWidth });
+  const mainW = mainEl.clientWidth || document.querySelector('#content')?.clientWidth || window.innerWidth - 220;
+  const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420), width: mainW });
   chartState.mainChart = mc;
 
   let mainSeries;
@@ -1021,36 +1053,49 @@ function renderCharts() {
       upColor: '#00e676', downColor: '#ff1744', borderUpColor: '#00e676', borderDownColor: '#ff1744',
       wickUpColor: '#00e676', wickDownColor: '#ff1744'
     });
-    mainSeries.setData(bars.map(b => ({ time: b.t.split('T')[0] || toTs(b.t), open: b.o, high: b.h, low: b.l, close: b.c })));
+    mainSeries.setData(bars.map(b => {
+      const isIntraday = b.t.includes('T') && !b.t.endsWith('T04:00:00Z') || (chartState.tf === '1D' || chartState.tf === '5D');
+      const t = isIntraday ? Math.floor(new Date(b.t).getTime()/1000) : b.t.split('T')[0];
+      return { time: t, open: b.o, high: b.h, low: b.l, close: b.c };
+    }));
   } else {
     mainSeries = mc.addLineSeries({ color: '#7c4dff', lineWidth: 2 });
-    mainSeries.setData(bars.map(b => ({ time: b.t.split('T')[0] || toTs(b.t), value: b.c })));
+    mainSeries.setData(bars.map(b => {
+      const isIntraday = b.t.includes('T') && (chartState.tf === '1D' || chartState.tf === '5D');
+      const t = isIntraday ? Math.floor(new Date(b.t).getTime()/1000) : b.t.split('T')[0];
+      return { time: t, value: b.c };
+    }));
   }
   chartState.series.main = mainSeries;
 
   // ---- VOLUME SUB-CHART ----
   const volEl = document.getElementById('chart-vol');
   volEl.innerHTML = '';
-  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80), width: volEl.clientWidth });
+  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80), width: volEl.clientWidth || mainW });
   chartState.volChart = vc;
   const volSeries = vc.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
   volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
-  volSeries.setData(bars.map(b => ({ time: b.t.split('T')[0], value: b.v, color: b.c >= b.o ? '#00e67655' : '#ff174455' })));
+  volSeries.setData(bars.map(b => {
+    const isIntraday = b.t.includes('T') && (chartState.tf === '1D' || chartState.tf === '5D');
+    const t = isIntraday ? Math.floor(new Date(b.t).getTime()/1000) : b.t.split('T')[0];
+    return { time: t, value: b.v, color: b.c >= b.o ? '#00e67655' : '#ff174455' };
+  }));
   chartState.series.vol = volSeries;
 
   // ---- RSI SUB-CHART ----
   const rsiEl = document.getElementById('chart-rsi');
   rsiEl.innerHTML = '';
-  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100), width: rsiEl.clientWidth });
+  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100), width: rsiEl.clientWidth || mainW });
   chartState.rsiChart = rc;
   const rsiData = calcRSI(bars.map(b => b.c), 14);
   const rsiSeries = rc.addLineSeries({ color: '#ff9800', lineWidth: 1.5, priceFormat: { type: 'price', precision: 1 } });
-  rsiSeries.setData(rsiData.map((v, i) => ({ time: bars[i + 14].t.split('T')[0], value: v })));
-  // OB/OS lines
+  const isIntra = chartState.tf === '1D' || chartState.tf === '5D';
+  const barTime = (b) => isIntra ? Math.floor(new Date(b.t).getTime()/1000) : b.t.split('T')[0];
+  rsiSeries.setData(rsiData.map((v, i) => ({ time: barTime(bars[i + 14]), value: v })));
   const ob = rc.addLineSeries({ color: '#ff174455', lineWidth: 1, lineStyle: 2, priceFormat: {type:'price'} });
   const os = rc.addLineSeries({ color: '#00e67655', lineWidth: 1, lineStyle: 2, priceFormat: {type:'price'} });
-  ob.setData(rsiData.map((_, i) => ({ time: bars[i+14].t.split('T')[0], value: 70 })));
-  os.setData(rsiData.map((_, i) => ({ time: bars[i+14].t.split('T')[0], value: 30 })));
+  ob.setData(rsiData.map((_, i) => ({ time: barTime(bars[i+14]), value: 70 })));
+  os.setData(rsiData.map((_, i) => ({ time: barTime(bars[i+14]), value: 30 })));
   chartState.series.rsi = rsiSeries;
 
   // ---- MACD SUB-CHART (rendered if toggled) ----
@@ -1062,15 +1107,20 @@ function renderCharts() {
   // Sync time scales
   syncTimeScales();
 
-  // Resize on window resize
-  const ro = new ResizeObserver(() => {
+  // Resize on window resize + immediate resize after paint
+  const doResize = () => {
     try {
-      mc.applyOptions({ width: mainEl.clientWidth });
-      vc.applyOptions({ width: volEl.clientWidth });
-      rc.applyOptions({ width: rsiEl.clientWidth });
+      const w = mainEl.clientWidth || mainW;
+      mc.applyOptions({ width: w });
+      if (chartState.volChart) vc.applyOptions({ width: volEl.clientWidth || w });
+      if (chartState.rsiChart) rc.applyOptions({ width: rsiEl.clientWidth || w });
+      if (chartState.macdChart) try { chartState.macdChart.applyOptions({ width: document.getElementById('chart-macd').clientWidth || w }); } catch(e){}
     } catch(e){}
-  });
+  };
+  requestAnimationFrame(() => { requestAnimationFrame(doResize); });
+  const ro = new ResizeObserver(doResize);
   ro.observe(mainEl);
+  window.addEventListener('resize', doResize);
 }
 
 function renderMacdChart() {
@@ -1080,15 +1130,17 @@ function renderMacdChart() {
   const wrap = document.getElementById('chart-macd-wrap');
   const el = document.getElementById('chart-macd');
   el.innerHTML = '';
-  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100), width: el.clientWidth });
+  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100), width: el.clientWidth || mainW });
   chartState.macdChart = mc2;
   const macdLine = mc2.addLineSeries({ color: '#00bcd4', lineWidth: 1.5 });
   const signalLine = mc2.addLineSeries({ color: '#ff9800', lineWidth: 1.5 });
   const histSeries = mc2.addHistogramSeries({ priceFormat: { type: 'price' } });
   const startIdx = 26 + 9 - 2;
-  macdLine.setData(macdData.macd.map((v, i) => ({ time: bars[i + startIdx].t.split('T')[0], value: v })));
-  signalLine.setData(macdData.signal.map((v, i) => ({ time: bars[i + startIdx].t.split('T')[0], value: v })));
-  histSeries.setData(macdData.hist.map((v, i) => ({ time: bars[i + startIdx].t.split('T')[0], value: v, color: v >= 0 ? '#00e67666' : '#ff174466' })));
+  const isIntra2 = chartState.tf === '1D' || chartState.tf === '5D';
+  const bTime2 = (b) => isIntra2 ? Math.floor(new Date(b.t).getTime()/1000) : b.t.split('T')[0];
+  macdLine.setData(macdData.macd.map((v, i) => ({ time: bTime2(bars[i + startIdx]), value: v })));
+  signalLine.setData(macdData.signal.map((v, i) => ({ time: bTime2(bars[i + startIdx]), value: v })));
+  histSeries.setData(macdData.hist.map((v, i) => ({ time: bTime2(bars[i + startIdx]), value: v, color: v >= 0 ? '#00e67666' : '#ff174466' })));
   chartState.series.macd = { macdLine, signalLine, histSeries };
 }
 
@@ -1109,7 +1161,8 @@ function updateIndicators() {
   const highs  = bars.map(b => b.h);
   const lows   = bars.map(b => b.l);
   const mc = chartState.mainChart;
-  const times = bars.map(b => b.t.split('T')[0]);
+  const isIntrad = chartState.tf === '1D' || chartState.tf === '5D';
+  const times = bars.map(b => isIntrad ? Math.floor(new Date(b.t).getTime()/1000) : b.t.split('T')[0]);
 
   // Remove old overlay series
   ['ma20','ma50','ma200','ema21','bb_upper','bb_lower','bb_mid','vwap','fib_levels'].forEach(k => {
