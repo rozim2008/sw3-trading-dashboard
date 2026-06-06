@@ -1029,7 +1029,11 @@ function renderCharts() {
   // ---- MAIN CHART ----
   const mainEl = document.getElementById('chart-main');
   mainEl.innerHTML = '';
-  const mainW = mainEl.clientWidth || document.querySelector('#content')?.clientWidth || window.innerWidth - 220;
+  // Force min dimensions so LightweightCharts can render
+  const contentEl = document.getElementById('content') || document.querySelector('.main-content') || document.body;
+  const mainW = Math.max(mainEl.offsetWidth || 0, contentEl.offsetWidth - 40, window.innerWidth - 260, 600);
+  mainEl.style.width = mainW + 'px';
+  mainEl.style.height = '420px';
   const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420), width: mainW });
   chartState.mainChart = mc;
 
@@ -1057,7 +1061,8 @@ function renderCharts() {
   // ---- VOLUME SUB-CHART ----
   const volEl = document.getElementById('chart-vol');
   volEl.innerHTML = '';
-  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80), width: volEl.clientWidth || mainW });
+  volEl.style.width = mainW + 'px'; volEl.style.height = '80px';
+  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80), width: mainW });
   chartState.volChart = vc;
   const volSeries = vc.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
   volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
@@ -1071,7 +1076,8 @@ function renderCharts() {
   // ---- RSI SUB-CHART ----
   const rsiEl = document.getElementById('chart-rsi');
   rsiEl.innerHTML = '';
-  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100), width: rsiEl.clientWidth || mainW });
+  rsiEl.style.width = mainW + 'px'; rsiEl.style.height = '100px';
+  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100), width: mainW });
   chartState.rsiChart = rc;
   const rsiData = calcRSI(bars.map(b => b.c), 14);
   const rsiSeries = rc.addLineSeries({ color: '#ff9800', lineWidth: 1.5, priceFormat: { type: 'price', precision: 1 } });
