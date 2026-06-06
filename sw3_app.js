@@ -975,9 +975,15 @@ async function loadChartData() {
     // Use double rAF to ensure layout is complete after page becomes visible
     requestAnimationFrame(() => requestAnimationFrame(() => {
       try { renderCharts(); } catch(renderErr) {
-        document.getElementById('chart-loading').style.display='flex';
-        document.getElementById('chart-loading').textContent='Chart render error: '+renderErr.message;
-        console.error('renderCharts error:',renderErr);
+        const el = document.getElementById('chart-loading');
+        el.style.display='flex';
+        el.style.background='#3a0000';
+        el.style.color='#ff6b6b';
+        el.style.flexDirection='column';
+        el.style.fontSize='13px';
+        el.style.padding='20px';
+        el.innerHTML = '<strong>Chart Render Error:</strong><br>' + renderErr.message + '<br><small>' + (renderErr.stack||'').split('\n').slice(0,3).join('<br>') + '</small>';
+        console.error('renderCharts error:', renderErr);
       }
     }));
     updatePriceBadge();
