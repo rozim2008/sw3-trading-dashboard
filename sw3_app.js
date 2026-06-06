@@ -970,42 +970,22 @@ async function loadChartData() {
   }
 }
 
+function daysAgo(n) {
+  const d = new Date(); d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+}
 function tfParams(tf) {
-  const now = new Date();
-  // Use yesterday as end to avoid weekend/holiday gaps
-  const endD = new Date(now); endD.setDate(endD.getDate() - 1);
-  const end = endD.toISOString().split('T')[0];
+  // Always use a wide end date (today+1) so weekends/holidays are covered
+  const end = daysAgo(-1); // tomorrow in ISO — ensures all recent bars are included
   let start, resolution, limit;
   switch(tf) {
-    case '1D': {
-      // Go back 5 days to ensure we get at least 1 trading day of intraday bars
-      const s = new Date(now); s.setDate(s.getDate()-5);
-      start = s.toISOString().split('T')[0]; resolution = '5Min'; limit = 500; break;
-    }
-    case '5D': {
-      const s = new Date(now); s.setDate(s.getDate()-7);
-      start = s.toISOString().split('T')[0]; resolution = '15Min'; limit = 500; break;
-    }
-    case '1M': {
-      const s = new Date(now); s.setMonth(s.getMonth()-1); s.setDate(s.getDate()-3);
-      start = s.toISOString().split('T')[0]; resolution = '1Hour'; limit = 500; break;
-    }
-    case '3M': {
-      const s = new Date(now); s.setMonth(s.getMonth()-3); s.setDate(s.getDate()-5);
-      start = s.toISOString().split('T')[0]; resolution = '1Day'; limit = 100; break;
-    }
-    case '6M': {
-      const s = new Date(now); s.setMonth(s.getMonth()-6); s.setDate(s.getDate()-5);
-      start = s.toISOString().split('T')[0]; resolution = '1Day'; limit = 200; break;
-    }
-    case '1Y': {
-      const s = new Date(now); s.setFullYear(s.getFullYear()-1); s.setDate(s.getDate()-5);
-      start = s.toISOString().split('T')[0]; resolution = '1Day'; limit = 365; break;
-    }
-    default: {
-      const s = new Date(now); s.setDate(s.getDate()-5);
-      start = s.toISOString().split('T')[0]; resolution = '5Min'; limit = 500;
-    }
+    case '1D':  start = daysAgo(7);   resolution = '5Min';  limit = 500; break;
+    case '5D':  start = daysAgo(10);  resolution = '15Min'; limit = 500; break;
+    case '1M':  start = daysAgo(35);  resolution = '1Hour'; limit = 500; break;
+    case '3M':  start = daysAgo(100); resolution = '1Day';  limit = 100; break;
+    case '6M':  start = daysAgo(190); resolution = '1Day';  limit = 200; break;
+    case '1Y':  start = daysAgo(370); resolution = '1Day';  limit = 365; break;
+    default:    start = daysAgo(7);   resolution = '5Min';  limit = 500;
   }
   return { start, end, resolution, limit };
 }
