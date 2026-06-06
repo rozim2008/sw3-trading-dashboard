@@ -1012,7 +1012,7 @@ const CHART_OPTS = (height) => ({
   crosshair: { mode: 1 },
   timeScale: { borderColor: '#2a2a3a', timeVisible: true, secondsVisible: false },
   rightPriceScale: { borderColor: '#2a2a3a' },
-  autoSize: false,
+  autoSize: true,
   height
 });
 
@@ -1031,10 +1031,9 @@ function renderCharts() {
   mainEl.innerHTML = '';
   // Force min dimensions so LightweightCharts can render
   const contentEl = document.getElementById('content') || document.querySelector('.main-content') || document.body;
-  const mainW = Math.max(mainEl.offsetWidth || 0, contentEl.offsetWidth - 40, window.innerWidth - 260, 600);
-  mainEl.style.width = mainW + 'px';
   mainEl.style.height = '420px';
-  const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420), width: mainW });
+  const mainW = mainEl.offsetWidth || (window.innerWidth - 260);
+  const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420) });
   chartState.mainChart = mc;
 
   let mainSeries;
@@ -1061,8 +1060,8 @@ function renderCharts() {
   // ---- VOLUME SUB-CHART ----
   const volEl = document.getElementById('chart-vol');
   volEl.innerHTML = '';
-  volEl.style.width = mainW + 'px'; volEl.style.height = '80px';
-  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80), width: mainW });
+  volEl.style.height = '80px';
+  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80) });
   chartState.volChart = vc;
   const volSeries = vc.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
   volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
@@ -1076,8 +1075,8 @@ function renderCharts() {
   // ---- RSI SUB-CHART ----
   const rsiEl = document.getElementById('chart-rsi');
   rsiEl.innerHTML = '';
-  rsiEl.style.width = mainW + 'px'; rsiEl.style.height = '100px';
-  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100), width: mainW });
+  rsiEl.style.height = '100px';
+  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100) });
   chartState.rsiChart = rc;
   const rsiData = calcRSI(bars.map(b => b.c), 14);
   const rsiSeries = rc.addLineSeries({ color: '#ff9800', lineWidth: 1.5, priceFormat: { type: 'price', precision: 1 } });
@@ -1102,11 +1101,7 @@ function renderCharts() {
   // Resize on window resize + immediate resize after paint
   const doResize = () => {
     try {
-      const w = mainEl.clientWidth || mainW;
-      mc.applyOptions({ width: w });
-      if (chartState.volChart) vc.applyOptions({ width: volEl.clientWidth || w });
-      if (chartState.rsiChart) rc.applyOptions({ width: rsiEl.clientWidth || w });
-      if (chartState.macdChart) try { chartState.macdChart.applyOptions({ width: document.getElementById('chart-macd').clientWidth || w }); } catch(e){}
+      mc.timeScale().fitContent();
     } catch(e){}
   };
   requestAnimationFrame(() => { requestAnimationFrame(doResize); });
@@ -1122,7 +1117,8 @@ function renderMacdChart() {
   const wrap = document.getElementById('chart-macd-wrap');
   const el = document.getElementById('chart-macd');
   el.innerHTML = '';
-  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100), width: el.clientWidth || document.getElementById('chart-main').clientWidth || window.innerWidth - 220 });
+  el.style.height = '100px';
+  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100) });
   chartState.macdChart = mc2;
   const macdLine = mc2.addLineSeries({ color: '#00bcd4', lineWidth: 1.5 });
   const signalLine = mc2.addLineSeries({ color: '#ff9800', lineWidth: 1.5 });
