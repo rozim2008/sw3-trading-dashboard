@@ -972,11 +972,14 @@ async function loadChartData() {
     const bars = data.bars || [];
     if (!bars.length) throw new Error('No data returned for ' + sym);
     chartState.ohlcv = bars;
-    try { renderCharts(); } catch(renderErr) {
-      document.getElementById('chart-loading').style.display='flex';
-      document.getElementById('chart-loading').textContent='Chart render error: '+renderErr.message;
-      console.error('renderCharts error:',renderErr); return;
-    }
+    // Use double rAF to ensure layout is complete after page becomes visible
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      try { renderCharts(); } catch(renderErr) {
+        document.getElementById('chart-loading').style.display='flex';
+        document.getElementById('chart-loading').textContent='Chart render error: '+renderErr.message;
+        console.error('renderCharts error:',renderErr);
+      }
+    }));
     updatePriceBadge();
   } catch(e) {
     document.getElementById('chart-loading').style.display='flex';
@@ -1015,13 +1018,13 @@ function destroyCharts() {
   chartState.series = {};
 }
 
-const CHART_OPTS = (height) => ({
+const CHART_OPTS = (height, width) => ({
   layout: { background: { color: '#151522' }, textColor: '#a0a0b8' },
   grid: { vertLines: { color: '#1e1e2e' }, horzLines: { color: '#1e1e2e' } },
   crosshair: { mode: 1 },
   timeScale: { borderColor: '#2a2a3a', timeVisible: true, secondsVisible: false },
   rightPriceScale: { borderColor: '#2a2a3a' },
-  autoSize: true,
+  width: width || 900,
   height
 });
 
@@ -1042,7 +1045,8 @@ function renderCharts() {
   const contentEl = document.getElementById('content') || document.querySelector('.main-content') || document.body;
   mainEl.style.height = '420px';
   const mainW = mainEl.offsetWidth || (window.innerWidth - 260);
-  const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420) });
+  const chartW = mainEl.clientWidth || mainEl.offsetWidth || (window.innerWidth - 280);
+  const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420, chartW) });
   chartState.mainChart = mc;
 
   let mainSeries;
@@ -1070,7 +1074,7 @@ function renderCharts() {
   const volEl = document.getElementById('chart-vol');
   volEl.innerHTML = '';
   volEl.style.height = '80px';
-  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80) });
+  const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80, chartW) });
   chartState.volChart = vc;
   const volSeries = vc.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
   volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });
@@ -1085,7 +1089,7 @@ function renderCharts() {
   const rsiEl = document.getElementById('chart-rsi');
   rsiEl.innerHTML = '';
   rsiEl.style.height = '100px';
-  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100) });
+  const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100, chartW) });
   chartState.rsiChart = rc;
   const rsiData = calcRSI(bars.map(b => b.c), 14);
   const rsiSeries = rc.addLineSeries({ color: '#ff9800', lineWidth: 1.5, priceFormat: { type: 'price', precision: 1 } });
@@ -1127,7 +1131,7 @@ function renderMacdChart() {
   const el = document.getElementById('chart-macd');
   el.innerHTML = '';
   el.style.height = '100px';
-  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100) });
+  const mc2 = LightweightCharts.createChart(el, { ...CHART_OPTS(100, el.clientWidth || el.offsetWidth || (window.innerWidth - 280)) });
   chartState.macdChart = mc2;
   const macdLine = mc2.addLineSeries({ color: '#00bcd4', lineWidth: 1.5 });
   const signalLine = mc2.addLineSeries({ color: '#ff9800', lineWidth: 1.5 });
