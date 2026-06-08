@@ -251,9 +251,7 @@ async function loadPortfolioChart() {
 
 // ===== SIGNALS =====
 async function loadSignals() {
-  // signals loaded via fetchSignals below
-  // Use entity API
-  renderSignals();
+  await renderSignals();
   renderRecentSignals();
 }
 
