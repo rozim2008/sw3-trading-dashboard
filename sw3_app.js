@@ -971,23 +971,33 @@ async function loadChartData() {
     chartState.ohlcv = bars;
     // Use 300ms timeout to ensure layout is fully settled after page becomes visible
     setTimeout(() => {
-      try { renderCharts(); } catch(renderErr) {
+      try {
+        renderCharts();
+      } catch(renderErr) {
         const el = document.getElementById('chart-loading');
-        el.style.display='flex';
-        el.style.background='#3a0000';
-        el.style.color='#ff6b6b';
-        el.style.flexDirection='column';
-        el.style.fontSize='13px';
-        el.style.padding='20px';
-        el.innerHTML = '<strong>Chart Render Error:</strong><br>' + renderErr.message + '<br><small>' + (renderErr.stack||'').split('\n').slice(0,3).join('<br>') + '</small>';
+        el.style.display = 'flex';
+        el.style.background = '#200000';
+        el.style.color = '#ff8080';
+        el.style.flexDirection = 'column';
+        el.style.fontSize = '13px';
+        el.style.padding = '20px';
+        el.style.zIndex = '100';
+        el.innerHTML = '<strong style="color:#ff4444;font-size:16px;">⚠ Render Error</strong><br>' + renderErr.message + '<br><pre style="font-size:10px;color:#ff6060;white-space:pre-wrap;">' + (renderErr.stack||'').split('\n').slice(0,5).join('\n') + '</pre>';
         console.error('renderCharts error:', renderErr);
       }
     }, 300);
     updatePriceBadge();
   } catch(e) {
-    document.getElementById('chart-loading').style.display='flex';
-    document.getElementById('chart-loading').textContent = 'Could not load data: ' + e.message;
-    console.error('loadChartData error:',e);
+    const el = document.getElementById('chart-loading');
+    el.style.display = 'flex';
+    el.style.background = '#200000';
+    el.style.color = '#ff8080';
+    el.style.flexDirection = 'column';
+    el.style.padding = '20px';
+    el.style.fontSize = '13px';
+    el.style.zIndex = '100';
+    el.innerHTML = '<strong style="color:#ff4444;font-size:15px;">⚠ Data Load Error</strong><br>' + e.message;
+    console.error('loadChartData error:', e);
   }
 }
 
