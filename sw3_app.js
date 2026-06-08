@@ -1047,13 +1047,11 @@ function renderCharts() {
   // ---- MAIN CHART ----
   const mainEl = document.getElementById('chart-main');
   mainEl.innerHTML = '';
-  // Force min dimensions so LightweightCharts can render
-  const contentEl = document.getElementById('content') || document.querySelector('.main-content') || document.body;
+  // Force explicit pixel dimensions before LightweightCharts reads them
+  const sidebarW = 220;
+  const chartW = Math.max(window.innerWidth - sidebarW - 48, 400); // 48 = content padding
   mainEl.style.height = '420px';
-  const mainW = mainEl.offsetWidth || (window.innerWidth - 260);
-  const chartRect = mainEl.getBoundingClientRect();
-  const chartW = (chartRect.width > 50 ? chartRect.width : null) || mainEl.clientWidth || mainEl.offsetWidth || (window.innerWidth - 260);
-  console.log('[SW3] chartW resolved to:', chartW, 'rect.width:', chartRect.width);
+  mainEl.style.width = chartW + 'px';
   const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420, chartW) });
   chartState.mainChart = mc;
 
@@ -1082,6 +1080,7 @@ function renderCharts() {
   const volEl = document.getElementById('chart-vol');
   volEl.innerHTML = '';
   volEl.style.height = '80px';
+  volEl.style.width = chartW + 'px';
   const vc = LightweightCharts.createChart(volEl, { ...CHART_OPTS(80, chartW) });
   chartState.volChart = vc;
   const volSeries = vc.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
@@ -1097,6 +1096,7 @@ function renderCharts() {
   const rsiEl = document.getElementById('chart-rsi');
   rsiEl.innerHTML = '';
   rsiEl.style.height = '100px';
+  rsiEl.style.width = chartW + 'px';
   const rc = LightweightCharts.createChart(rsiEl, { ...CHART_OPTS(100, chartW) });
   chartState.rsiChart = rc;
   const rsiData = calcRSI(bars.map(b => b.c), 14);
