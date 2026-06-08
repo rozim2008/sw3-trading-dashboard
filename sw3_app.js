@@ -944,8 +944,7 @@ function openChart(symbol, name, fromPage) {
   chartState.name = name || symbol;
   chartState.prevPage = fromPage || 'watchlist';
   state.chartPrevPage = chartState.prevPage;
-  showPage('chart');
-  loadChartData();
+  showPage('chart'); // showPage('chart') already calls loadChartData() internally
 }
 
 // Make showPage aware of chart
