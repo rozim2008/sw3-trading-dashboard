@@ -972,8 +972,8 @@ async function loadChartData() {
     const bars = data.bars || [];
     if (!bars.length) throw new Error('No data returned for ' + sym);
     chartState.ohlcv = bars;
-    // Use double rAF to ensure layout is complete after page becomes visible
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    // Use 300ms timeout to ensure layout is fully settled after page becomes visible
+    setTimeout(() => {
       try { renderCharts(); } catch(renderErr) {
         const el = document.getElementById('chart-loading');
         el.style.display='flex';
@@ -985,7 +985,7 @@ async function loadChartData() {
         el.innerHTML = '<strong>Chart Render Error:</strong><br>' + renderErr.message + '<br><small>' + (renderErr.stack||'').split('\n').slice(0,3).join('<br>') + '</small>';
         console.error('renderCharts error:', renderErr);
       }
-    }));
+    }, 300);
     updatePriceBadge();
   } catch(e) {
     document.getElementById('chart-loading').style.display='flex';
@@ -1051,7 +1051,9 @@ function renderCharts() {
   const contentEl = document.getElementById('content') || document.querySelector('.main-content') || document.body;
   mainEl.style.height = '420px';
   const mainW = mainEl.offsetWidth || (window.innerWidth - 260);
-  const chartW = mainEl.clientWidth || mainEl.offsetWidth || (window.innerWidth - 280);
+  const chartRect = mainEl.getBoundingClientRect();
+  const chartW = (chartRect.width > 50 ? chartRect.width : null) || mainEl.clientWidth || mainEl.offsetWidth || (window.innerWidth - 260);
+  console.log('[SW3] chartW resolved to:', chartW, 'rect.width:', chartRect.width);
   const mc = LightweightCharts.createChart(mainEl, { ...CHART_OPTS(420, chartW) });
   chartState.mainChart = mc;
 
