@@ -67,16 +67,23 @@ const statusBadge = (s) => `<span class="badge badge-${s?.toLowerCase()}">${s}</
 
 async function apiCall(fn, payload) {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
     const r = await fetch(`${APP_URL}/functions/${fn}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     const result = await r.json();
     // Track credit usage: ~1 credit per function call
     incrementCredit(1);
     return result;
-  } catch(e) { return { error: e.message }; }
+  } catch(e) {
+    console.error(`apiCall ${fn} error:`, e.message);
+    return { error: e.message };
+  }
 }
 
 function showToast(msg, type='info') {
@@ -260,8 +267,17 @@ async function fetchSignals(filter='') {
     const payload = { action: 'get_signals' };
     if (filter) payload.status_filter = filter;
     const data = await apiCall('aiAgent', payload);
+    if (data.error) {
+      console.error('fetchSignals error:', data.error);
+      const el = document.getElementById('signals-table');
+      if (el) el.innerHTML = `<div class="empty" style="color:#ff6b6b;"><div class="empty-icon">⚠</div><p>Error loading signals: ${data.error}</p></div>`;
+      return [];
+    }
     return data.signals || [];
-  } catch(e) { return []; }
+  } catch(e) {
+    console.error('fetchSignals exception:', e);
+    return [];
+  }
 }
 
 // ===== SIGNAL SORT STATE =====
@@ -293,6 +309,7 @@ function onSortSignals(col) {
 
 function renderSignalsTable(signals) {
   const el = document.getElementById('signals-table');
+  if (!el) { console.error('signals-table element not found'); return; }
   if (!signals || !signals.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🎯</div><p>No signals yet. Analyze a symbol to generate signals.</p></div>';
     return;
