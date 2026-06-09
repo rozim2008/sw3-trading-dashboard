@@ -330,7 +330,7 @@ function renderSignalsTable(signals) {
   </tr></thead><tbody>` +
     sorted.map(s => `<tr>
       <td style="font-size:11px;">${new Date(s.created_date).toLocaleString()}</td>
-      <td><strong>${s.symbol}</strong><br/><span class="tag">${s.strategy || '—'}</span></td>
+      <td style="cursor:pointer;" onclick="openChart('${s.symbol}','${s.symbol}','signals')"><strong style="color:#00e5ff;" class="symbol-link">${s.symbol}</strong><br/><span class="tag">${s.strategy || '—'}</span></td>
       <td>${signalBadge(s.signal_type)}</td>
       <td><div style="display:flex;align-items:center;gap:6px;"><div style="width:60px;background:var(--bg3);border-radius:3px;height:6px;overflow:hidden;"><div style="width:${s.confidence}%;background:${s.confidence>75?'#00e676':s.confidence>55?'#ffd600':'#ff1744'};height:100%;"></div></div><span>${s.confidence}%</span></div></td>
       <td>${fmt(s.entry_price)}</td>
@@ -1404,18 +1404,5 @@ function renderWatchlist() {
     </tr>`).join('') + '</tbody></table>';
 }
 
-// Patch renderSignalsTable to make symbol clickable
-const _origRenderSignals = renderSignalsTable;
-function renderSignalsTable(signals) {
-  _origRenderSignals(signals);
-  // Add click handlers to symbol cells after render
-  setTimeout(() => {
-    document.querySelectorAll('#signals-table td:first-child strong').forEach(el => {
-      const sym = el.textContent.trim();
-      el.classList.add('symbol-link');
-      el.style.cursor = 'pointer';
-      el.onclick = () => openChart(sym, sym, 'signals');
-    });
-  }, 50);
-}
+// Symbol click handlers are now built into renderSignalsTable directly
 
