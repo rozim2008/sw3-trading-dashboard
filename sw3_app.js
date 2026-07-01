@@ -179,7 +179,7 @@ function renderPositionsMini() {
     const pnl = parseFloat(p.unrealized_pl || 0);
     const pnlPct = parseFloat(p.unrealized_plpc || 0) * 100;
     return `<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-      <div><div style="font-size:13px;font-weight:700;">${p.symbol}</div><div style="font-size:11px;color:var(--text3);">${fmtNum(p.qty)} shares @ ${fmt(p.avg_entry_price)}</div></div>
+      <div><div class="symbol-link" style="font-size:13px;font-weight:700;cursor:pointer;color:#00e5ff;" onclick="openChart('${p.symbol}','${p.symbol}','portfolio')">${p.symbol}</div><div style="font-size:11px;color:var(--text3);">${fmtNum(p.qty)} shares @ ${fmt(p.avg_entry_price)}</div></div>
       <div style="text-align:right;"><div style="font-size:13px;font-weight:700;">${fmt(p.market_value)}</div><div class="${pnlClass(pnl)}" style="font-size:11px;">${fmt(pnl)} (${fmtPct(pnlPct)})</div></div>
     </div>`;
   }).join('');
@@ -194,7 +194,7 @@ function renderPositionsTable() {
       const unrealPct = parseFloat(p.unrealized_plpc || 0) * 100;
       const todayPnl = parseFloat(p.unrealized_intraday_pl || 0);
       return `<tr>
-        <td><strong>${p.symbol}</strong><br/><span class="tag">${p.asset_class}</span></td>
+        <td><strong class="symbol-link" style="cursor:pointer;color:#00e5ff;" onclick="openChart('${p.symbol}','${p.symbol}','portfolio')">${p.symbol}</strong><br/><span class="tag">${p.asset_class}</span></td>
         <td>${fmtNum(p.qty)}</td>
         <td>${fmt(p.avg_entry_price)}</td>
         <td>${fmt(p.current_price)}</td>
@@ -426,7 +426,7 @@ async function loadOrders() {
   el.innerHTML = `<table><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Type</th><th>Qty</th><th>Price</th><th>Filled Avg</th><th>Status</th><th>Actions</th></tr></thead><tbody>` +
     orders.map(o => `<tr>
       <td style="font-size:11px;">${new Date(o.created_at).toLocaleString()}</td>
-      <td><strong>${o.symbol}</strong></td>
+      <td><strong class="symbol-link" style="cursor:pointer;color:#00e5ff;" onclick="openChart('${o.symbol}','${o.symbol}','orders')">${o.symbol}</strong></td>
       <td>${signalBadge(o.side?.toUpperCase())}</td>
       <td><span class="tag">${o.type}</span></td>
       <td>${o.qty || o.notional || '—'}</td>
@@ -444,7 +444,7 @@ async function loadRecentOrders() {
   if(!orders.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>No recent orders</p></div>'; return; }
   el.innerHTML = orders.map(o => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
-      <div>${signalBadge(o.side?.toUpperCase())} <strong>${o.symbol}</strong> <span class="text-xs">${o.qty} shares</span></div>
+      <div>${signalBadge(o.side?.toUpperCase())} <strong class="symbol-link" style="cursor:pointer;color:#00e5ff;" onclick="openChart('${o.symbol}','${o.symbol}','orders')">${o.symbol}</strong> <span class="text-xs">${o.qty} shares</span></div>
       <div>${statusBadge(o.status)}</div>
     </div>`).join('');
 }
@@ -689,7 +689,7 @@ async function scanWatchlist() {
 async function loadWatchlist() {
   try {
     const data = await apiCall('aiAgent', { action: 'get_watchlist' });
-    state.watchlist = data.watchlist || [];
+    state.watchlist = data.items || data.watchlist || [];
   } catch(e) { state.watchlist = []; }
   renderWatchlist();
   renderWatchlistMini();
@@ -697,17 +697,19 @@ async function loadWatchlist() {
 
 function renderWatchlist() {
   const el = document.getElementById('watchlist-table');
+  if(!el) return;
   if(!state.watchlist.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👁</div><p>No symbols in watchlist. Add some to get started.</p></div>'; return; }
   el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Name</th><th>Asset Class</th><th>Sector</th><th>Priority</th><th>Active</th><th>Notes</th><th>Actions</th></tr></thead><tbody>` +
     state.watchlist.map(w => `<tr>
-      <td><strong>${w.symbol}</strong></td>
-      <td>${w.name || '—'}</td>
+      <td><strong class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\'")}','watchlist')">${w.symbol}</strong></td>
+      <td class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\'")}','watchlist')" style="color:var(--text2);">${w.name || '—'}</td>
       <td><span class="tag">${w.asset_class || 'stock'}</span></td>
       <td>${w.sector || '—'}</td>
       <td class="priority-${w.priority}">${w.priority || '—'}</td>
       <td>${w.active ? '✅' : '⬜'}</td>
       <td style="font-size:11px;color:var(--text2);">${w.notes || '—'}</td>
       <td><div class="btn-group">
+        <button class="btn btn-ghost btn-sm" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\'")}','watchlist')">📈 Chart</button>
         <button class="btn btn-ghost btn-sm" onclick="document.getElementById('analyze-symbol').value='${w.symbol}';showPage('analyze');analyzeSymbol()">Analyze</button>
         <button class="btn btn-danger btn-sm" onclick="removeFromWatchlist('${w.id}')">✕</button>
       </div></td>
@@ -1380,29 +1382,4 @@ function calcEMAFull(closes, period) {
   return res;
 }
 
-// ============================================================
-// MAKE SYMBOLS CLICKABLE IN WATCHLIST + SIGNALS + PORTFOLIO
-// ============================================================
-// Patch renderWatchlist to add symbol-link
-const _origRenderWatchlist = renderWatchlist;
-function renderWatchlist() {
-  const el = document.getElementById('watchlist-table');
-  if (!state.watchlist.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👁</div><p>No symbols in watchlist.</p></div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Name</th><th>Asset Class</th><th>Sector</th><th>Active</th><th>Notes</th><th>Actions</th></tr></thead><tbody>` +
-    state.watchlist.map(w => `<tr>
-      <td><strong class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\\'")}','watchlist')">${w.symbol}</strong></td>
-      <td class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\\'")}','watchlist')" style="color:var(--text2);">${w.name || '—'}</td>
-      <td><span class="tag">${w.asset_class || 'stock'}</span></td>
-      <td>${w.sector || '—'}</td>
-      <td>${w.active ? '✅' : '⬜'}</td>
-      <td style="font-size:11px;color:var(--text2);">${w.notes || '—'}</td>
-      <td><div class="btn-group">
-        <button class="btn btn-ghost btn-sm" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\\'")}','watchlist')">📈 Chart</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('analyze-symbol').value='${w.symbol}';showPage('analyze');analyzeSymbol()">Analyze</button>
-        <button class="btn btn-danger btn-sm" onclick="removeFromWatchlist('${w.id}')">✕</button>
-      </div></td>
-    </tr>`).join('') + '</tbody></table>';
-}
-
-// Symbol click handlers are now built into renderSignalsTable directly
 
