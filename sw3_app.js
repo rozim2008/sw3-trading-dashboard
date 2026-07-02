@@ -992,6 +992,7 @@ async function loadChartData() {
     setTimeout(() => {
       try {
         renderCharts();
+        updatePriceBadge();
       } catch(renderErr) {
         const el = document.getElementById('chart-loading');
         el.style.display = 'flex';
@@ -1005,7 +1006,6 @@ async function loadChartData() {
         console.error('renderCharts error:', renderErr);
       }
     }, 300);
-    updatePriceBadge();
   } catch(e) {
     const el = document.getElementById('chart-loading');
     el.style.display = 'flex';
@@ -1068,6 +1068,11 @@ function renderCharts() {
     const dayBars = bars.filter(b => b.t.startsWith(lastDate));
     if (dayBars.length > 0) bars = dayBars;
   }
+  // Store the exact dataset actually plotted on the main/volume/RSI charts so
+  // overlay indicators (MA/EMA/BB/VWAP/Fib) and the MACD panel use the SAME
+  // range — otherwise they'd stretch the timescale to fit a wider unfiltered
+  // dataset and squish the visible candles into a sliver.
+  chartState.displayBars = bars;
   document.getElementById('chart-loading').style.display = 'none';
 
   // ---- MAIN CHART ----
@@ -1158,7 +1163,7 @@ function renderCharts() {
 }
 
 function renderMacdChart() {
-  const bars = chartState.ohlcv;
+  const bars = chartState.displayBars || chartState.ohlcv;
   const closes = bars.map(b => b.c);
   const macdData = calcMACD(closes, 12, 26, 9);
   const wrap = document.getElementById('chart-macd-wrap');
@@ -1190,7 +1195,7 @@ function syncTimeScales() {
 }
 
 function updateIndicators() {
-  const bars = chartState.ohlcv;
+  const bars = chartState.displayBars || chartState.ohlcv;
   if (!bars.length || !chartState.mainChart) return;
   const closes = bars.map(b => b.c);
   const highs  = bars.map(b => b.h);
@@ -1281,7 +1286,7 @@ function updateLegend() {
 }
 
 function updatePriceBadge() {
-  const bars = chartState.ohlcv;
+  const bars = chartState.displayBars || chartState.ohlcv;
   if (!bars.length) return;
   const last = bars[bars.length - 1];
   const first = bars[0];
