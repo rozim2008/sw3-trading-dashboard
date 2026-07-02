@@ -1379,6 +1379,12 @@ function calcMACD(closes, fast, slow, signal) {
   return { macd: macdLine.slice(signal - 1), signal: signalArr, hist };
 }
 function calcEMAFull(closes, period) {
+  // Guard: matches calcSMA/calcEMA's safe behavior — if there isn't enough
+  // history yet (e.g. early in the trading day on a 1D intraday chart),
+  // return an empty series instead of seeding one bogus value. Without this,
+  // MACD's index math (which assumes emaSlow.length lines up with closes.length)
+  // breaks and crashes trying to read timestamps past the end of the bars array.
+  if (closes.length < period) return [];
   const k = 2 / (period + 1);
   const res = [closes.slice(0, period).reduce((a, b) => a + b, 0) / period];
   for (let i = period; i < closes.length; i++) {
