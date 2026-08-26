@@ -55,6 +55,7 @@ let state = {
   portfolioChart: null,
   portfolioChartBig: null,
   analysisChart: null,
+  watchlistSort: { column: null, direction: 'asc' },
 };
 
 // Helpers
@@ -695,12 +696,56 @@ async function loadWatchlist() {
   renderWatchlistMini();
 }
 
+function sortWatchlistBy(column) {
+  if(state.watchlistSort.column === column) {
+    state.watchlistSort.direction = state.watchlistSort.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.watchlistSort.column = column;
+    state.watchlistSort.direction = 'asc';
+  }
+  renderWatchlist();
+}
+
+function getSortedWatchlist() {
+  if(!state.watchlistSort.column) return state.watchlist;
+  const { column, direction } = state.watchlistSort;
+  const sorted = [...state.watchlist].sort((a, b) => {
+    let av = a[column], bv = b[column];
+    if(av == null) av = '';
+    if(bv == null) bv = '';
+    if(typeof av === 'string') av = av.toLowerCase();
+    if(typeof bv === 'string') bv = bv.toLowerCase();
+    if(av < bv) return direction === 'asc' ? -1 : 1;
+    if(av > bv) return direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+}
+
+function sortArrow(column) {
+  if(state.watchlistSort.column !== column) return ' <span style="opacity:0.3;font-size:10px;">↕</span>';
+  return state.watchlistSort.direction === 'asc' ? ' <span style="font-size:10px;">↑</span>' : ' <span style="font-size:10px;">↓</span>';
+}
+
 function renderWatchlist() {
   const el = document.getElementById('watchlist-table');
   if(!el) return;
   if(!state.watchlist.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👁</div><p>No symbols in watchlist. Add some to get started.</p></div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Name</th><th>Asset Class</th><th>Sector</th><th>Priority</th><th>Active</th><th>Notes</th><th>Actions</th></tr></thead><tbody>` +
-    state.watchlist.map(w => `<tr>
+  const sorted = getSortedWatchlist();
+  const cols = [
+    {key:'symbol', label:'Symbol'},
+    {key:'name', label:'Name'},
+    {key:'asset_class', label:'Asset Class'},
+    {key:'sector', label:'Sector'},
+    {key:'priority', label:'Priority'},
+    {key:'active', label:'Active'},
+    {key:'notes', label:'Notes'}
+  ];
+  const headers = cols.map(c =>
+    `<th style="cursor:pointer;user-select:none;white-space:nowrap;" onclick="sortWatchlistBy('${c.key}')" title="Click to sort by ${c.label}">${c.label}${sortArrow(c.key)}</th>`
+  ).join('') + '<th>Actions</th>';
+  el.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>` +
+    sorted.map(w => `<tr>
       <td><strong class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\'")}','watchlist')">${w.symbol}</strong></td>
       <td class="symbol-link" onclick="openChart('${w.symbol}','${(w.name||w.symbol).replace(/'/g,"\'")}','watchlist')" style="color:var(--text2);">${w.name || '—'}</td>
       <td><span class="tag">${w.asset_class || 'stock'}</span></td>
