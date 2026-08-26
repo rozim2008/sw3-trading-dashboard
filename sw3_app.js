@@ -56,6 +56,8 @@ let state = {
   portfolioChartBig: null,
   analysisChart: null,
   watchlistSort: { column: null, direction: 'asc' },
+  portfolioSort: { column: null, direction: 'asc' },
+  ordersSort: { column: null, direction: 'asc' },
 };
 
 // Helpers
@@ -186,11 +188,60 @@ function renderPositionsMini() {
   }).join('');
 }
 
+function sortPortfolioBy(column) {
+  if(state.portfolioSort.column === column) {
+    state.portfolioSort.direction = state.portfolioSort.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.portfolioSort.column = column;
+    state.portfolioSort.direction = 'asc';
+  }
+  renderPositionsTable();
+}
+
+function getSortedPositions() {
+  if(!state.portfolioSort.column) return state.positions;
+  const { column, direction } = state.portfolioSort;
+  const colMap = {
+    'symbol': p => p.symbol || '',
+    'qty': p => parseFloat(p.qty) || 0,
+    'avg_entry': p => parseFloat(p.avg_entry_price) || 0,
+    'current_price': p => parseFloat(p.current_price) || 0,
+    'market_value': p => parseFloat(p.market_value) || 0,
+    'unrealized_pl': p => parseFloat(p.unrealized_pl) || 0,
+    'today_pl': p => parseFloat(p.unrealized_intraday_pl) || 0
+  };
+  const getter = colMap[column] || (p => p[column]);
+  const sorted = [...state.positions].sort((a, b) => {
+    const av = getter(a), bv = getter(b);
+    if(typeof av === 'string') return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return direction === 'asc' ? av - bv : bv - av;
+  });
+  return sorted;
+}
+
+function portfolioSortArrow(column) {
+  if(state.portfolioSort.column !== column) return ' <span style="opacity:0.3;font-size:10px;">↕</span>';
+  return state.portfolioSort.direction === 'asc' ? ' <span style="font-size:10px;">↑</span>' : ' <span style="font-size:10px;">↓</span>';
+}
+
 function renderPositionsTable() {
   const el = document.getElementById('positions-table');
   if(!state.positions.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>No open positions</p></div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Symbol</th><th>Qty</th><th>Avg Entry</th><th>Current Price</th><th>Market Value</th><th>Unrealized P&L</th><th>Today's P&L</th><th>Actions</th></tr></thead><tbody>` +
-    state.positions.map(p => {
+  const sorted = getSortedPositions();
+  const cols = [
+    {key:'symbol', label:'Symbol'},
+    {key:'qty', label:'Qty'},
+    {key:'avg_entry', label:'Avg Entry'},
+    {key:'current_price', label:'Current Price'},
+    {key:'market_value', label:'Market Value'},
+    {key:'unrealized_pl', label:'Unrealized P&L'},
+    {key:'today_pl', label:"Today's P&L"}
+  ];
+  const headers = cols.map(c =>
+    `<th style="cursor:pointer;user-select:none;white-space:nowrap;" onclick="sortPortfolioBy('${c.key}')" title="Click to sort by ${c.label}">${c.label}${portfolioSortArrow(c.key)}</th>`
+  ).join('') + '<th>Actions</th>';
+  el.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>` +
+    sorted.map(p => {
       const unreal = parseFloat(p.unrealized_pl || 0);
       const unrealPct = parseFloat(p.unrealized_plpc || 0) * 100;
       const todayPnl = parseFloat(p.unrealized_intraday_pl || 0);
@@ -418,13 +469,61 @@ function showSignalDetail(s) {
 }
 
 // ===== ORDERS =====
-async function loadOrders() {
-  const filter = document.getElementById('orders-filter')?.value || 'all';
-  const data = await apiCall('alpacaAccount', { action: 'get_orders', status: filter, limit: 50 });
+function sortOrdersBy(column) {
+  if(state.ordersSort.column === column) {
+    state.ordersSort.direction = state.ordersSort.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.ordersSort.column = column;
+    state.ordersSort.direction = 'asc';
+  }
+  renderOrdersTable();
+}
+
+function getSortedOrders() {
+  if(!state.ordersSort.column) return state.orders;
+  const { column, direction } = state.ordersSort;
+  const colMap = {
+    'time': o => new Date(o.created_at).getTime() || 0,
+    'symbol': o => o.symbol || '',
+    'side': o => o.side || '',
+    'type': o => o.type || '',
+    'qty': o => parseFloat(o.qty) || 0,
+    'price': o => parseFloat(o.limit_price) || 0,
+    'filled_avg': o => parseFloat(o.filled_avg_price) || 0,
+    'status': o => o.status || ''
+  };
+  const getter = colMap[column] || (o => o[column]);
+  const sorted = [...state.orders].sort((a, b) => {
+    const av = getter(a), bv = getter(b);
+    if(typeof av === 'string') return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return direction === 'asc' ? av - bv : bv - av;
+  });
+  return sorted;
+}
+
+function ordersSortArrow(column) {
+  if(state.ordersSort.column !== column) return ' <span style="opacity:0.3;font-size:10px;">↕</span>';
+  return state.ordersSort.direction === 'asc' ? ' <span style="font-size:10px;">↑</span>' : ' <span style="font-size:10px;">↓</span>';
+}
+
+function renderOrdersTable() {
   const el = document.getElementById('orders-table');
-  const orders = data.orders || [];
+  const orders = getSortedOrders();
   if(!orders.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>No orders found</p></div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Type</th><th>Qty</th><th>Price</th><th>Filled Avg</th><th>Status</th><th>Actions</th></tr></thead><tbody>` +
+  const cols = [
+    {key:'time', label:'Time'},
+    {key:'symbol', label:'Symbol'},
+    {key:'side', label:'Side'},
+    {key:'type', label:'Type'},
+    {key:'qty', label:'Qty'},
+    {key:'price', label:'Price'},
+    {key:'filled_avg', label:'Filled Avg'},
+    {key:'status', label:'Status'}
+  ];
+  const headers = cols.map(c =>
+    `<th style="cursor:pointer;user-select:none;white-space:nowrap;" onclick="sortOrdersBy('${c.key}')" title="Click to sort by ${c.label}">${c.label}${ordersSortArrow(c.key)}</th>`
+  ).join('') + '<th>Actions</th>';
+  el.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>` +
     orders.map(o => `<tr>
       <td style="font-size:11px;">${new Date(o.created_at).toLocaleString()}</td>
       <td><strong class="symbol-link" style="cursor:pointer;color:#00e5ff;" onclick="openChart('${o.symbol}','${o.symbol}','orders')">${o.symbol}</strong></td>
@@ -436,6 +535,15 @@ async function loadOrders() {
       <td>${statusBadge(o.status)}</td>
       <td>${['new','accepted','pending_new'].includes(o.status) ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder('${o.id}')">Cancel</button>` : '—'}</td>
     </tr>`).join('') + '</tbody></table>';
+}
+
+async function loadOrders() {
+  const filter = document.getElementById('orders-filter')?.value || 'all';
+  const data = await apiCall('alpacaAccount', { action: 'get_orders', status: filter, limit: 50 });
+  const el = document.getElementById('orders-table');
+  state.orders = data.orders || [];
+  if(!state.orders.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>No orders found</p></div>'; return; }
+  renderOrdersTable();
 }
 
 async function loadRecentOrders() {
