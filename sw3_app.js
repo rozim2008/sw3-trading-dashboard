@@ -172,6 +172,38 @@ async function loadPositions() {
     document.getElementById('positions-value').textContent = fmt(totalVal) + ' market value';
     renderPositionsMini();
     renderPositionsTable();
+    updateTotalPnL();
+  }
+}
+
+function updateTotalPnL() {
+  const positions = state.positions || [];
+  const totalUnreal = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
+  const totalCost = positions.reduce((s, p) => s + parseFloat(p.cost_basis || 0), 0);
+  const totalPct = totalCost !== 0 ? (totalUnreal / totalCost) * 100 : 0;
+
+  // Overview page
+  const el1 = document.getElementById('total-pnl');
+  if(el1) {
+    el1.textContent = fmt(totalUnreal);
+    el1.className = `stat-value ${pnlClass(totalUnreal)}`;
+  }
+  const el1p = document.getElementById('total-pnl-pct');
+  if(el1p) {
+    el1p.textContent = fmtPct(totalPct) + ' all positions';
+    el1p.className = pnlClass(totalPct);
+  }
+
+  // Portfolio page
+  const el2 = document.getElementById('p-total-pnl');
+  if(el2) {
+    el2.textContent = fmt(totalUnreal);
+    el2.className = `stat-value ${pnlClass(totalUnreal)}`;
+  }
+  const el2p = document.getElementById('p-total-pnl-pct');
+  if(el2p) {
+    el2p.textContent = fmtPct(totalPct) + ' total return';
+    el2p.className = pnlClass(totalPct);
   }
 }
 
